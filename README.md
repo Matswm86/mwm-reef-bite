@@ -1,5 +1,13 @@
 # MWM Reef Bite
 
+<p>
+  <img src="screenshots/gameplay.jpg" width="280" alt="Level 2: the golden player fish in open water, bubble rings around smaller fish it can eat and a spiky ring around a bigger fish">
+  <img src="screenshots/steering.jpg" width="280" alt="Level 1: the fish glides toward the aim ring a little above the finger">
+  <img src="screenshots/win_card.jpg" width="280" alt="Level 1 win card: the grown fish, one star and the replay, map and next buttons">
+</p>
+
+**How to play:** hold a finger where you want to go and the fish glides there calmly, slowing down and settling under your finger. Eat the fish inside bubble rings, keep away from the spiky ones.
+
 An underwater eat-and-grow game for children (ages 4-7 on Lett, 8+ on Vanlig). You steer a small golden fish with one finger through a sunlit kelp forest, eat the fish that are smaller than you, keep away from the bigger ones and grow until you reach the level's goal. A big fish that catches you just burps you out in a bubble, so a small child never loses.
 
 **Download the Android APK:** https://github.com/Matswm86/mwm-reef-bite/releases/download/latest/mwm-reef-bite.apk
@@ -21,7 +29,7 @@ World 1 "Tareskogen" (kelp forest), levels 1-5, in two settings:
 | 5 | Solstriper | grow to 4 / 5 | calm breather level |
 
 How it plays:
-- **Follow the finger:** hold a finger where you want to swim; the fish swims to a point a little above the fingertip. A tap works too.
+- **Follow the finger:** hold a finger where you want to swim; the fish glides to a point a little above the fingertip, eases in and settles there, and turns around smoothly. Speeds are kept slow enough for a 4-year-old to follow (softer controls after the owner's phone test, 2026-10-10). A tap works too.
 - **Size tiers:** every fish has a size 1-10. Smaller fish are food, bigger fish are danger, same-size fish just bump.
 - **Four "can I eat it?" cues, none of them colour:** the size itself, your fish's mouth opens when food is in front of it, a smooth bubble ring around food and a spiky zigzag ring around danger, and danger fish open their mouths when close.
 - **Gentle catch:** Lett costs nothing (burped out in a bubble). Vanlig empties the current size meter; world 1 has unlimited bubbles, so there is never a restart here.
