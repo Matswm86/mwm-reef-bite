@@ -21,13 +21,42 @@ var less_motion: bool = false
 var gear: RbDisc
 var discs: Array[RbLevelDisc] = []
 var _t: float = 0.0
+## The level discs are painted once into this layer and re-rendered only
+## when they change (refresh, press), so the static map costs a handful of
+## draw calls instead of about 150 (QA 2026-10-10 finding 6).
+var _vp: SubViewport
+var _painter: Control
+var _view: TextureRect
+var _live: Control
 
 
 func _ready() -> void:
 	size = Vector2(RbBalance.DESIGN_W, RbBalance.DESIGN_H)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_vp = SubViewport.new()
+	_vp.size = Vector2i(int(size.x), int(size.y))
+	_vp.transparent_bg = true
+	_vp.disable_3d = true
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(_vp)
+	_painter = Control.new()
+	_painter.size = size
+	_painter.draw.connect(_paint_discs)
+	_vp.add_child(_painter)
+	_view = TextureRect.new()
+	_view.size = size
+	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_view.texture = _vp.get_texture()
+	add_child(_view)
+	_live = Control.new()
+	_live.size = size
+	_live.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_live.draw.connect(_draw_pulse)
+	add_child(_live)
 	for i: int in RbLevels.count():
 		var d := RbLevelDisc.new()
+		d.baked = true
+		d.look_changed.connect(_bake)
 		d.level_id = i + 1
 		d.disc_radius = 100.0
 		d.size = Vector2(240, 240)
@@ -55,8 +84,26 @@ func refresh() -> void:
 		d.cleared = RbGame.is_cleared(d.level_id)
 		d.suggested = d.level_id == sug
 		d.less_motion = less_motion
-		d.queue_redraw()
+	_bake()
 	queue_redraw()
+	_live.queue_redraw()
+
+
+func _bake() -> void:
+	_painter.queue_redraw()
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+func _paint_discs() -> void:
+	for d: RbLevelDisc in discs:
+		if d.visible:
+			d.paint(_painter, d.position, false)
+
+
+func _draw_pulse() -> void:
+	for d: RbLevelDisc in discs:
+		if d.visible:
+			d.paint_pulse(_live, d.position, _t)
 
 
 ## Camera cutout: the gear moves down with the home disc; its touch area
@@ -71,14 +118,18 @@ func _process(delta: float) -> void:
 	_t += delta
 	if visible and not less_motion:
 		queue_redraw()
+		_live.queue_redraw()
 
 
+## Bubble path between the visible discs, all rings in one draw_multiline
+## call (one draw call, the bob stays live).
 func _draw() -> void:
-	# Bubble path between the visible discs.
 	var pts: Array[Vector2] = []
 	for d: RbLevelDisc in discs:
 		if d.visible:
 			pts.append(SPOTS[d.level_id - 1])
+	var segs := PackedVector2Array()
+	var ring_n: int = 16
 	for i: int in pts.size() - 1:
 		var a: Vector2 = pts[i]
 		var b: Vector2 = pts[i + 1]
@@ -91,4 +142,10 @@ func _draw() -> void:
 			var bob: float = 0.0 if less_motion else sin(_t * 1.6 + float(k + i * 3)) * 3.0
 			var r: float = 9.0 + 4.0 * sin(f * PI)
 			p.y += bob
-			draw_arc(p, r, 0.0, TAU, 16, Color(1, 1, 1, 0.85), 3.0, true)
+			for j: int in ring_n:
+				var a0: float = TAU * float(j) / float(ring_n)
+				var a1: float = TAU * float(j + 1) / float(ring_n)
+				segs.append(p + Vector2(cos(a0), sin(a0)) * r)
+				segs.append(p + Vector2(cos(a1), sin(a1)) * r)
+	if not segs.is_empty():
+		draw_multiline(segs, Color(1, 1, 1, 0.85), 3.0, true)

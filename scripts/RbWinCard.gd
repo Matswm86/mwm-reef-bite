@@ -37,6 +37,10 @@ var _pic: TextureRect
 var _viewport: SubViewport
 var _card_box: StyleBoxFlat
 var _overlay: Control
+## The picture renders this many frames after the camera is first framed,
+## then stays frozen: a live picture re-rendered the whole world every
+## frame (76 draws Høy / 73 Lav, QA 2026-10-10 finding 6).
+var _pic_frames_left: int = 0
 
 
 func _ready() -> void:
@@ -123,7 +127,7 @@ func show_card(has_next: bool, goal: int, is_pearls: bool) -> void:
 	_t = 0.0
 	visible = true
 	modulate.a = 1.0 if less_motion else 0.0
-	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_pic_frames_left = 2
 	set_process(true)
 
 
@@ -147,6 +151,9 @@ func frame_player(at: Vector3, length_m: float) -> void:
 	var dist: float = clampf(length_m * 3.6, 1.6, 6.0)
 	pic_camera.position = at + Vector3(0.0, 0.05, dist)
 	pic_camera.look_at(at, Vector3.UP)
+	if _pic_frames_left > 0:
+		_pic_frames_left -= 1
+		_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
 func _process(delta: float) -> void:
