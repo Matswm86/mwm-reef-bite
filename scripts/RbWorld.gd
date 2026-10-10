@@ -19,6 +19,21 @@ const FOG_MID := Color(0.059, 0.329, 0.420)
 const FOG_DEEP := Color(0.024, 0.200, 0.278)
 const PLAY_WATER := Color(0.165, 0.408, 0.459)
 const SUN := Color(1.0, 0.961, 0.859)
+## Tonemap and rays rendered the open water about 2x the DESIGN 8c token;
+## fog and backdrop (always together, else fogged scenery shows a lighter
+## rectangle) are scaled so it lands near #2A6875 (QA 2026-10-10 finding 2).
+const WATER_RENDER_K: float = 0.75
+## More depth fog on the near kelp (11.5-19 m) so it reads as teal
+## silhouettes like the mock; the play plane (9-9.7 m) stays fog-free.
+const FOG_END: float = 26.0
+## God rays (shader default 0.16) lifted the open lane over the water
+## token; 0.12 keeps the shafts and lets the gold flank reach 3:1.
+const RAY_STRENGTH: float = 0.12
+const FOG_CURVE: float = 0.35
+## Kelp forest cooled toward teal-olive and darker: the gold player is the
+## only warm saturated thing on screen (DESIGN 3).
+const FOREST_BRIGHTNESS: float = 0.55
+const FOREST_COOL_MIX: float = 0.65
 const KELP_DIR := "res://assets/models/kelp/"
 
 var camera: Camera3D
@@ -33,6 +48,10 @@ var _kelp_mesh: ArrayMesh
 var _kelp_mat: ShaderMaterial
 var _glb_kelp_mats: Array[ShaderMaterial] = []
 var _patch_mat: ShaderMaterial
+var _patch_glb_mat: ShaderMaterial
+var _stipe_mat: ShaderMaterial
+var _patch_meshes: Array[Mesh] = []
+var _patch_verts: Array[PackedVector3Array] = []
 var _patch_root: Node3D
 var _patch_rock_mat: ShaderMaterial
 var _rays_mat: ShaderMaterial
@@ -102,12 +121,12 @@ func _build_camera_env() -> void:
 	env.tonemap_exposure = 1.05
 	env.fog_enabled = true
 	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_light_color = PLAY_WATER
+	env.fog_light_color = _water(PLAY_WATER)
 	env.fog_light_energy = 1.0
 	env.fog_density = 1.0
 	env.fog_depth_begin = 10.0
-	env.fog_depth_end = 34.0
-	env.fog_depth_curve = 0.8
+	env.fog_depth_end = FOG_END
+	env.fog_depth_curve = FOG_CURVE
 	env.fog_sky_affect = 1.0
 	env.fog_height = -2.5
 	env.fog_height_density = 0.15
@@ -127,6 +146,10 @@ func _build_camera_env() -> void:
 	sun.look_at_from_position(Vector3.ZERO, dir, Vector3(0, 0, -1))
 
 
+func _water(c: Color) -> Color:
+	return Color(c.r * WATER_RENDER_K, c.g * WATER_RENDER_K, c.b * WATER_RENDER_K)
+
+
 func _caustic_mat(shader_path: String) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = load(shader_path)
@@ -143,9 +166,9 @@ func _build_backdrop() -> void:
 	mi.position = Vector3(0.0, 4.0, -40.0)
 	var m := ShaderMaterial.new()
 	m.shader = load("res://shaders/rb_backdrop.gdshader")
-	m.set_shader_parameter("top_color", FOG_TOP)
-	m.set_shader_parameter("mid_color", PLAY_WATER)
-	m.set_shader_parameter("deep_color", FOG_DEEP)
+	m.set_shader_parameter("top_color", _water(FOG_TOP))
+	m.set_shader_parameter("mid_color", _water(PLAY_WATER))
+	m.set_shader_parameter("deep_color", _water(FOG_DEEP))
 	m.set_shader_parameter("top_y", 14.0)
 	m.set_shader_parameter("mid_y", 0.0)
 	m.set_shader_parameter("deep_y", -8.0)
@@ -338,7 +361,8 @@ func _build_kelp_forest() -> void:
 		var h2: float = _rng.randf_range(0.85, 1.2) if use_glb else _rng.randf_range(5.0, 8.0)
 		far_xf.append(_kelp_xf(x, z, h2))
 	if use_glb:
-		var mat: ShaderMaterial = _kelp_glb_material(0.06, 0.8)
+		var mat: ShaderMaterial = _kelp_glb_material(0.06, FOREST_BRIGHTNESS)
+		mat.set_shader_parameter("cool_mix", FOREST_COOL_MIX)
 		add_child(_kelp_mmi(near_xf[0], mat, near_meshes[0]))
 		add_child(_kelp_mmi(near_xf[1], mat, near_meshes[1]))
 		add_child(_kelp_mmi(far_xf, mat, far_mesh))
@@ -551,6 +575,7 @@ func _build_rays() -> void:
 	mi.mesh = st.commit()
 	_rays_mat = ShaderMaterial.new()
 	_rays_mat.shader = load("res://shaders/rb_rays.gdshader")
+	_rays_mat.set_shader_parameter("strength", RAY_STRENGTH)
 	mi.material_override = _rays_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.sorting_offset = -10.0
@@ -648,21 +673,86 @@ func _build_snow() -> void:
 
 func _build_patches() -> void:
 	_patch_mat = _kelp_material(true)
+	for n: String in RbKelpPatch.MESHES:
+		var m: Mesh = _glb_mesh(KELP_DIR + n + ".glb")
+		if m == null:
+			break
+		_patch_meshes.append(m)
+		_patch_verts.append(m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX])
+	if _patch_meshes.size() == RbKelpPatch.MESHES.size():
+		_patch_glb_mat = _kelp_glb_material(RbKelpPatch.SWAY, RbKelpPatch.BRIGHTNESS)
+		_patch_glb_mat.set_shader_parameter("cool_mix", RbKelpPatch.COOL_MIX)
+		_stipe_mat = _kelp_material(true)
+		_stipe_mat.set_shader_parameter("color_bottom", Color(0.10, 0.10, 0.06))
+		_stipe_mat.set_shader_parameter("color_top", Color(0.20, 0.20, 0.11))
+		_stipe_mat.set_shader_parameter("patch_lush", Color(0.16, 0.16, 0.09))
+		_stipe_mat.set_shader_parameter("patch_dry", Color(0.18, 0.18, 0.10))
 	_patch_root = Node3D.new()
 	_patch_root.name = "KelpPatches"
 	add_child(_patch_root)
 
 
-## On-plane kelp patches for the level (GDD 5.2, 6.4). Each patch is tall
-## kelp rooted on a boulder on the floor: a bare stipe below the patch rect
-## and the leafy canopy inside it, so the leaves sit exactly where the
-## player is safe. One MultiMesh per patch (canopy height differs).
+## On-plane kelp patches (GDD 5.2, 6.4): sculpted strands filling the safe
+## rect on a bare stipe (RbKelpPatch); procedural frond if models are off.
 func set_kelp_patches(rects: Array[Rect2]) -> void:
 	for c: Node in _patch_root.get_children():
 		c.queue_free()
 	_patch_root.visible = not rects.is_empty()
 	if rects.is_empty():
 		return
+	if _patch_meshes.size() == RbKelpPatch.MESHES.size():
+		_patch_glb(rects)
+	else:
+		_patch_procedural(rects)
+
+
+func _patch_glb(rects: Array[Rect2]) -> void:
+	var r := RandomNumberGenerator.new()
+	r.seed = 31
+	var per_mesh: Array = [[], [], []]
+	var stipes: Array = []
+	var rm := MultiMesh.new()
+	rm.transform_format = MultiMesh.TRANSFORM_3D
+	rm.mesh = _rock_mesh()
+	rm.instance_count = rects.size()
+	for i: int in rects.size():
+		var rect: Rect2 = rects[i]
+		for k: int in RbKelpPatch.MESHES.size():
+			for j: int in RbKelpPatch.STRANDS_PER_MESH:
+				var z: float = RbKelpPatch.Z - 0.03 * float(k * RbKelpPatch.STRANDS_PER_MESH + j)
+				var turn: float = r.randf_range(-0.8, 0.8) + PI * float(j)
+				var xf: Transform3D = RbKelpPatch.fit_strand(
+					_patch_verts[k], _patch_meshes[k].get_aabb().end.y, turn, rect, z
+				)
+				(per_mesh[k] as Array).append(xf)
+		# Bare stipe from the floor up to the bottom of the leaves.
+		var fz: float = (CAM_DIST - RbKelpPatch.Z) / CAM_DIST
+		var bot: Vector3 = RbBalance.to_world(rect.end) * fz
+		var sh: float = maxf(bot.y - FLOOR_Y, 0.01)
+		stipes.append(
+			Transform3D(
+				Basis.from_scale(Vector3(1.0, sh, 1.0)), Vector3(bot.x, FLOOR_Y, RbKelpPatch.Z)
+			)
+		)
+		var rs: float = rect.size.x * 1.1 / RbBalance.PX_PER_M
+		rm.set_instance_transform(
+			i,
+			Transform3D(
+				Basis.IDENTITY.scaled(Vector3(rs, rs * 0.5, rs * 0.8)),
+				Vector3(bot.x, FLOOR_Y + 0.02, RbKelpPatch.Z)
+			)
+		)
+	for k: int in RbKelpPatch.MESHES.size():
+		_patch_root.add_child(_kelp_mmi(per_mesh[k], _patch_glb_mat, _patch_meshes[k]))
+	_patch_root.add_child(_kelp_mmi(stipes, _stipe_mat, RbKelpPatch.stipe_mesh()))
+	var rocks := MultiMeshInstance3D.new()
+	rocks.multimesh = rm
+	rocks.material_override = _patch_rock_mat
+	rocks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_patch_root.add_child(rocks)
+
+
+func _patch_procedural(rects: Array[Rect2]) -> void:
 	var floor_px: float = 960.0 - FLOOR_Y * RbBalance.PX_PER_M
 	var per: int = 7
 	var r := RandomNumberGenerator.new()
@@ -885,9 +975,10 @@ func _process(delta: float) -> void:
 		_apply_zoom()
 	if _shimmer_t < 0.5:
 		_shimmer_t += delta
-		_patch_mat.set_shader_parameter(
-			"shimmer", clampf(_shimmer_t / 0.3, 0.0, 1.0) if _shimmer_t < 0.3 else 0.0
-		)
+		var sh: float = clampf(_shimmer_t / 0.3, 0.0, 1.0) if _shimmer_t < 0.3 else 0.0
+		_patch_mat.set_shader_parameter("shimmer", sh)
+		if _patch_glb_mat != null:
+			_patch_glb_mat.set_shader_parameter("shimmer", sh)
 	if not less_motion:
 		for i: int in _schools.size():
 			var s: Node3D = _schools[i]

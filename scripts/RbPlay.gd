@@ -98,8 +98,8 @@ func start_level(id: int) -> void:
 	player_view = RbFishView.new()
 	player_view.less_motion = less_motion
 	# The player's sun rim keeps it readable against the water (DESIGN 4;
-	# never brighten the water instead).
-	player_view.rim = 0.65
+	# never brighten the water instead). 0.85 since QA 2026-10-10 finding 2.
+	player_view.rim = 0.85
 	player_view.smooth_turn = true
 	world.actors.add_child(player_view)
 	player_view.setup("player", sim.p_tier, 0.0)
