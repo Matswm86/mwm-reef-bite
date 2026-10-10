@@ -273,6 +273,10 @@ func _phase_shots() -> void:
 	play.auto_bot = true
 	await _wait(6.0)
 	await _shot("13_l2_busy_perf")
+	# Draw-call split: the same frame without the 2D layer.
+	main.ui.visible = false
+	await _shot("14_l2_busy_no_ui")
+	main.ui.visible = true
 	play.auto_bot = false
 
 

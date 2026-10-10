@@ -6,7 +6,8 @@ extends Control
 ## its relative size; reached = white, current = glass with gold filling
 ## tail to nose, future = hollow, goal = gold star. Perler: N pearl slots and
 ## a small current-tier dot row. Vanlig with limited bobler: 3 bubble icons
-## at the right end.
+## at the right end. The drawing is cached in a SubViewport and re-rendered
+## only while something changes, so the HUD costs one draw call in play.
 
 const INK := Color(0.078, 0.094, 0.110)
 const WHITE := Color(1.0, 1.0, 1.0)
@@ -34,11 +35,31 @@ var _shimmer_tier: int = -1
 var _shimmer_t: float = 99.0
 var _pop_t: float = 99.0
 var _box: StyleBoxFlat
+var _vp: SubViewport
+var _c: Control
+var _view: TextureRect
+var _sig: String = ""
+var _anim_left: float = 0.0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	size = Vector2(RbBalance.DESIGN_W, 260.0)
+	_vp = SubViewport.new()
+	_vp.size = Vector2i(int(size.x), int(size.y))
+	_vp.transparent_bg = true
+	_vp.disable_3d = true
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(_vp)
+	_c = Control.new()
+	_c.size = size
+	_c.draw.connect(_draw_canvas)
+	_vp.add_child(_c)
+	_view = TextureRect.new()
+	_view.size = size
+	_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_view.texture = _vp.get_texture()
+	add_child(_view)
 	_box = StyleBoxFlat.new()
 	_box.bg_color = HUD_GLASS
 	_box.border_color = HUD_EDGE
@@ -59,7 +80,7 @@ func setup(goal_kind: String, target: int, bob: int) -> void:
 	_meter = 0.0
 	meter_target = 0.0
 	_shimmer_t = 99.0
-	queue_redraw()
+	_redraw()
 
 
 func set_state(new_tier: int, meter: float, pearl_n: int, bob: int) -> void:
@@ -84,11 +105,23 @@ func _process(delta: float) -> void:
 		_meter = move_toward(_meter, meter_target, delta / 0.2)
 	_shimmer_t += delta
 	_pop_t += delta
-	queue_redraw()
+	var sig: String = "%d %.3f %d %d %s" % [tier, _meter, pearls, bobler, goal]
+	var animating: bool = _shimmer_t < 0.35 or _pop_t < 0.35
+	if sig != _sig or animating or _anim_left > 0.0:
+		_anim_left = 0.05 if animating else maxf(0.0, _anim_left - delta)
+		_sig = sig
+		_redraw()
 
 
-func _draw() -> void:
-	draw_style_box(_box, PANEL)
+func _redraw() -> void:
+	if _c == null:
+		return
+	_c.queue_redraw()
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+func _draw_canvas() -> void:
+	_c.draw_style_box(_box, PANEL)
 	var limited: bool = bobler_max > 0
 	var x0: float = 280.0 if limited else PANEL.position.x + 30.0
 	var x1: float = 880.0 if limited else PANEL.end.x - 30.0
@@ -119,9 +152,9 @@ func _draw_row(x0: float, x1: float) -> void:
 		if t == goal_tier:
 			var sc: Vector2 = c + Vector2(l * 0.42, -l * 0.36)
 			var sp: PackedVector2Array = RbDisc.star_points(sc, 28.0, 12.0)
-			draw_colored_polygon(sp, GOLD)
+			_c.draw_colored_polygon(sp, GOLD)
 			sp.append(sp[0])
-			draw_polyline(sp, INK, 5.0, true)
+			_c.draw_polyline(sp, INK, 5.0, true)
 		x += w + GAP * scale_k
 
 
@@ -130,14 +163,14 @@ func _draw_silhouette(c: Vector2, l: float, t: int) -> void:
 	var closed := pts.duplicate()
 	closed.append(pts[0])
 	if t < tier or (t == tier and t == goal_tier and tier >= goal_tier):
-		draw_colored_polygon(pts, WHITE)
+		_c.draw_colored_polygon(pts, WHITE)
 		if t == _shimmer_tier and _shimmer_t < 0.3 and not less_motion:
 			var k: float = _shimmer_t / 0.3
-			draw_colored_polygon(pts, Color(GOLD, 0.5 * (1.0 - k)))
-		draw_polyline(closed, INK, 4.0, true)
-		draw_circle(RbDisc.fish_eye(c, l), maxf(2.5, l * 0.04), INK)
+			_c.draw_colored_polygon(pts, Color(GOLD, 0.5 * (1.0 - k)))
+		_c.draw_polyline(closed, INK, 4.0, true)
+		_c.draw_circle(RbDisc.fish_eye(c, l), maxf(2.5, l * 0.04), INK)
 	elif t == tier:
-		draw_colored_polygon(pts, HUD_GLASS)
+		_c.draw_colored_polygon(pts, HUD_GLASS)
 		if _meter > 0.001:
 			var tail_x: float = c.x - l * 0.5 - l * 0.22
 			var fill_x: float = tail_x + (l * 1.22) * _meter
@@ -150,16 +183,18 @@ func _draw_silhouette(c: Vector2, l: float, t: int) -> void:
 				]
 			)
 			for poly: PackedVector2Array in Geometry2D.intersect_polygons(pts, rect):
-				draw_colored_polygon(poly, GOLD)
+				_c.draw_colored_polygon(poly, GOLD)
 				var pc := poly.duplicate()
 				pc.append(poly[0])
-				draw_polyline(pc, INK, 3.0, true)
+				_c.draw_polyline(pc, INK, 3.0, true)
 		# hud_edge outline: the hollow part must read on the dark panel.
-		draw_polyline(closed, HUD_EDGE, 4.0, true)
-		draw_circle(RbDisc.fish_eye(c, l), maxf(2.5, l * 0.04), HUD_EDGE if _meter < 0.8 else INK)
+		_c.draw_polyline(closed, HUD_EDGE, 4.0, true)
+		_c.draw_circle(
+			RbDisc.fish_eye(c, l), maxf(2.5, l * 0.04), HUD_EDGE if _meter < 0.8 else INK
+		)
 	else:
-		draw_colored_polygon(pts, HUD_GLASS)
-		draw_polyline(closed, HUD_EDGE, 4.0, true)
+		_c.draw_colored_polygon(pts, HUD_GLASS)
+		_c.draw_polyline(closed, HUD_EDGE, 4.0, true)
 
 
 func _draw_pearls(x0: float, x1: float) -> void:
@@ -169,13 +204,13 @@ func _draw_pearls(x0: float, x1: float) -> void:
 	for i: int in n:
 		var c := Vector2(x0 + step * (float(i) + 0.5), 112.0)
 		if i < pearls:
-			draw_circle(c, r, WHITE)
-			draw_arc(c, r, 0.0, TAU, 40, INK, 4.0, true)
-			draw_circle(c + Vector2(-r * 0.35, -r * 0.35), r * 0.22, Color(1, 1, 1))
-			draw_arc(c, r * 0.72, PI * 0.9, PI * 1.4, 12, Color(0.75, 0.78, 0.8), 3.0, true)
+			_c.draw_circle(c, r, WHITE)
+			_c.draw_arc(c, r, 0.0, TAU, 40, INK, 4.0, true)
+			_c.draw_circle(c + Vector2(-r * 0.35, -r * 0.35), r * 0.22, Color(1, 1, 1))
+			_c.draw_arc(c, r * 0.72, PI * 0.9, PI * 1.4, 12, Color(0.75, 0.78, 0.8), 3.0, true)
 		else:
-			draw_circle(c, r, HUD_GLASS)
-			draw_arc(c, r - 2.0, 0.0, TAU, 40, HUD_EDGE, 4.0, true)
+			_c.draw_circle(c, r, HUD_GLASS)
+			_c.draw_arc(c, r - 2.0, 0.0, TAU, 40, HUD_EDGE, 4.0, true)
 	# Current tier as a dot row under the slots (tiers 2..cap).
 	var cap: int = RbBalance.PEARL_LEVEL_TIER_CAP
 	var dots: int = cap - start_tier + 1
@@ -185,25 +220,27 @@ func _draw_pearls(x0: float, x1: float) -> void:
 		var t: int = start_tier + i
 		var c2 := Vector2(sx + dx * float(i), 176.0)
 		if t <= tier:
-			draw_circle(c2, 9.0, GOLD if t == tier else WHITE)
-			draw_arc(c2, 9.0, 0.0, TAU, 20, INK, 2.5, true)
+			_c.draw_circle(c2, 9.0, GOLD if t == tier else WHITE)
+			_c.draw_arc(c2, 9.0, 0.0, TAU, 20, INK, 2.5, true)
 		else:
-			draw_arc(c2, 8.0, 0.0, TAU, 20, HUD_EDGE, 3.0, true)
+			_c.draw_arc(c2, 8.0, 0.0, TAU, 20, HUD_EDGE, 3.0, true)
 
 
 func _draw_bobler() -> void:
 	for i: int in bobler_max:
 		var c := Vector2(922.0 + float(i) * 48.0, 188.0)
 		if i < bobler:
-			draw_circle(c, 20.0, Color(1, 1, 1, 0.22))
-			draw_arc(c, 20.0, 0.0, TAU, 32, WHITE, 3.5, true)
-			draw_arc(c, 22.5, 0.0, TAU, 32, Color(INK, 0.35), 2.0, true)
-			draw_circle(c + Vector2(-7, -7), 4.0, WHITE)
+			_c.draw_circle(c, 20.0, Color(1, 1, 1, 0.22))
+			_c.draw_arc(c, 20.0, 0.0, TAU, 32, WHITE, 3.5, true)
+			_c.draw_arc(c, 22.5, 0.0, TAU, 32, Color(INK, 0.35), 2.0, true)
+			_c.draw_circle(c + Vector2(-7, -7), 4.0, WHITE)
 		elif i == bobler and _pop_t < 0.3 and not less_motion:
 			# One burst when a bubble pops (single, not a strobe).
 			var k: float = _pop_t / 0.3
 			for j: int in 8:
 				var a: float = TAU * float(j) / 8.0
-				draw_circle(c + Vector2(cos(a), sin(a)) * (12.0 + 18.0 * k), 3.0 * (1.0 - k), WHITE)
+				_c.draw_circle(
+					c + Vector2(cos(a), sin(a)) * (12.0 + 18.0 * k), 3.0 * (1.0 - k), WHITE
+				)
 		else:
-			draw_arc(c, 18.0, 0.0, TAU, 32, Color(HUD_EDGE, 0.4), 2.0, true)
+			_c.draw_arc(c, 18.0, 0.0, TAU, 32, Color(HUD_EDGE, 0.4), 2.0, true)

@@ -19,6 +19,8 @@ var flare: float = 0.0
 var flare_target: float = 0.0
 var flash: float = 0.0
 var dim_k: float = 0.0
+## Sun rim strength (DESIGN 4: the player 0.5+, other fish low). Set before setup().
+var rim: float = 0.15
 var _yaw: float = 0.0
 var _tilt: float = 0.0
 var _len_now: float = 72.0
@@ -26,7 +28,7 @@ var _len_from: float = 72.0
 var _len_to: float = 72.0
 var _grow_t: float = 99.0
 var _squash_t: float = 99.0
-var _jaw: Node3D
+var _geoms: Array[GeometryInstance3D] = []
 var _phase: float = 0.0
 
 
@@ -38,18 +40,19 @@ func setup(species_key: Variant, start_tier: int, phase: float) -> void:
 	model = made[0]
 	is_proxy = made[1]
 	add_child(model)
-	if not is_proxy:
-		_jaw = model.find_child("Jaw", true, false) as Node3D
-		if _jaw == null:
-			_jaw = model.find_child("jaw", true, false) as Node3D
+	if is_proxy:
+		_geoms.append(model as GeometryInstance3D)
+	else:
+		for c: Node in model.find_children("*", "GeometryInstance3D", true, false):
+			_geoms.append(c as GeometryInstance3D)
 	_len_now = RbBalance.tier_len(tier)
 	_len_from = _len_now
 	_len_to = _len_now
 	_apply_scale()
-	if is_proxy:
-		var mi := model as MeshInstance3D
-		mi.set_instance_shader_parameter(&"phase", phase)
-		mi.set_instance_shader_parameter(&"swim_hz", lerpf(3.4, 1.8, float(tier - 1) / 9.0))
+	for g: GeometryInstance3D in _geoms:
+		g.set_instance_shader_parameter(&"phase", phase)
+		g.set_instance_shader_parameter(&"swim_hz", lerpf(3.4, 1.8, float(tier - 1) / 9.0))
+		g.set_instance_shader_parameter(&"rim", rim)
 
 
 ## Snap to a new tier with the growth pop (0.35 s, 6% overshoot).
@@ -116,15 +119,12 @@ func sync(pos: Vector2, vel: Vector2, want_facing: float, delta: float) -> void:
 		_len_now = _len_to
 	_squash_t += delta
 	_apply_scale()
-	if is_proxy:
-		var mi := model as MeshInstance3D
-		mi.set_instance_shader_parameter(&"mouth", mouth)
-		mi.set_instance_shader_parameter(&"flare", flare)
-		mi.set_instance_shader_parameter(&"flash", flash)
-		mi.set_instance_shader_parameter(&"tint_dim", dim_k)
-		mi.set_instance_shader_parameter(&"swim_amp", 0.5 if less_motion else 1.0)
-	elif _jaw != null:
-		_jaw.rotation.z = -deg_to_rad(25.0) * maxf(mouth, flare)
+	for g: GeometryInstance3D in _geoms:
+		g.set_instance_shader_parameter(&"mouth", maxf(mouth, flare * 0.6))
+		g.set_instance_shader_parameter(&"flare", flare)
+		g.set_instance_shader_parameter(&"flash", flash)
+		g.set_instance_shader_parameter(&"tint_dim", dim_k)
+		g.set_instance_shader_parameter(&"swim_amp", 0.5 if less_motion else 1.0)
 
 
 func _apply_scale() -> void:

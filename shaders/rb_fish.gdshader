@@ -9,7 +9,7 @@ render_mode cull_back, diffuse_lambert, specular_schlick_ggx;
 
 uniform float metallic_k : hint_range(0.0, 1.0) = 0.35;
 uniform float roughness_k : hint_range(0.0, 1.0) = 0.34;
-uniform float rim_k : hint_range(0.0, 1.0) = 0.5;
+instance uniform float rim : hint_range(0.0, 1.0) = 0.3;
 uniform float rim_tint_k : hint_range(0.0, 1.0) = 0.6;
 uniform float caustic_on_fish : hint_range(0.0, 0.5) = 0.28;
 
@@ -96,7 +96,7 @@ void fragment() {
 	METALLIC = metallic_k * COLOR.a;
 	ROUGHNESS = roughness_k;
 	SPECULAR = 0.6;
-	RIM = rim_k;
+	RIM = rim;
 	RIM_TINT = rim_tint_k;
 	EMISSION = c * flash * 0.55;
 }

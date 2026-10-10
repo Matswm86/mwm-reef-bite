@@ -7,14 +7,14 @@ extends RefCounted
 ## each name list wins. Until a file exists, a procedural proxy is built
 ## (RbFishMesh) so the game is playable and every cue works.
 ##
-## GLB contract (any is fine, the loader fits it): the model is scaled so its
-## longest horizontal side equals the tier length and centred on its bounding
-## box. The nose must point to +X (set "flip" true in SPECIES for a model
-## whose nose points to -X). If the GLB holds an AnimationPlayer, its first
-## animation loops (swim). A node named "Jaw" (or "jaw") rotates down with the
-## mouth cue (GDD 4.3).
+## GLB contract (assets/models/fish/README.md): 1 m nose to tail, nose at +X,
+## surfaces fish_w1_body and fish_w1_fins sharing textures/fish_w1_*.png,
+## COLOR_0 = jaw / fin-flare / swim-bend masks. The loader fits any size to
+## the tier length, centres the bounding box and applies the game's fish
+## shaders (rb_fish_glb*.gdshader). Set "flip" true for a nose at -X.
 
 const MODEL_DIR := "res://assets/models/fish/"
+const CAUSTICS := "res://assets/textures/rb_caustics.png"
 
 ## World 1 species by tier (DESIGN 4a). names = file names tried in order.
 ## Palette: back, flank, belly, fin colours; pattern; body depth (height /
@@ -159,12 +159,16 @@ static var use_models: bool = OS.get_environment("RB_PROXY_FISH") != "1"
 static var _proxy_cache: Dictionary = {}
 static var _glb_cache: Dictionary = {}
 static var _material: ShaderMaterial
+static var _glb_mats: Dictionary = {}
+static var _merged_cache: Dictionary = {}
 
 
 ## Drops the static caches (called at exit so no resource outlives the tree).
 static func clear_cache() -> void:
 	_proxy_cache.clear()
 	_glb_cache.clear()
+	_glb_mats.clear()
+	_merged_cache.clear()
 	_material = null
 
 
@@ -189,7 +193,7 @@ static func proxy_material() -> ShaderMaterial:
 	if _material == null:
 		_material = ShaderMaterial.new()
 		_material.shader = load("res://shaders/rb_fish.gdshader")
-		_material.set_shader_parameter("caustic_tex", load("res://assets/textures/rb_caustics.png"))
+		_material.set_shader_parameter("caustic_tex", load(CAUSTICS))
 	return _material
 
 
@@ -239,7 +243,7 @@ static func _fit_unit(inst: Node3D, flip: bool) -> Node3D:
 	var s: float = 1.0 / length
 	pivot.transform = Transform3D(basis.scaled(Vector3(s, s, s)), Vector3.ZERO)
 	pivot.position = -(pivot.transform.basis * box.get_center())
-	_no_mask_albedo(inst)
+	_apply_fish_materials(inst)
 	for ap: Node in inst.find_children("*", "AnimationPlayer", true, false):
 		var player := ap as AnimationPlayer
 		var names: PackedStringArray = player.get_animation_list()
@@ -250,20 +254,58 @@ static func _fit_unit(inst: Node3D, flip: bool) -> Node3D:
 	return root
 
 
-## The sculpted fish carry shader masks in their vertex colours (DESIGN 10:
-## jaw / fin masks); Godot's glTF import would paint them as albedo, so the
-## loader turns that off on a copy of each material.
-static func _no_mask_albedo(n: Node) -> void:
+## The sculpted fish (assets/models/fish/README.md) have two surfaces,
+## fish_w1_body and fish_w1_fins, one shared 2048 atlas next to the GLBs and
+## shader masks in COLOR_0. They get the game's fish shaders. Lav tier: body
+## and fins merged into one surface (one draw call per fish, fins cut out
+## with alpha scissor, no normal map).
+static func _apply_fish_materials(n: Node) -> void:
 	for c: Node in n.find_children("*", "MeshInstance3D", true, false):
 		var mi := c as MeshInstance3D
 		if mi.mesh == null:
 			continue
-		for s: int in mi.mesh.get_surface_count():
-			var m := mi.get_active_material(s) as BaseMaterial3D
-			if m != null and m.vertex_color_use_as_albedo:
-				var copy := m.duplicate() as BaseMaterial3D
-				copy.vertex_color_use_as_albedo = false
-				mi.set_surface_override_material(s, copy)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if RbGame.quality_low:
+			mi.mesh = _merged(mi.mesh)
+			mi.material_override = glb_material("lav")
+			continue
+		for i: int in mi.mesh.get_surface_count():
+			var m: Material = mi.mesh.surface_get_material(i)
+			var fins: bool = m != null and m.resource_name.contains("fin")
+			mi.set_surface_override_material(i, glb_material("fins" if fins else "body"))
+
+
+static func _merged(mesh: Mesh) -> ArrayMesh:
+	var key: int = mesh.get_instance_id()
+	if _merged_cache.has(key):
+		return _merged_cache[key]
+	var st := SurfaceTool.new()
+	for i: int in mesh.get_surface_count():
+		st.append_from(mesh, i, Transform3D.IDENTITY)
+	var out: ArrayMesh = st.commit()
+	_merged_cache[key] = out
+	return out
+
+
+## Shared GLB fish materials: "body", "fins" or "lav".
+static func glb_material(kind: String) -> ShaderMaterial:
+	if _glb_mats.has(kind):
+		return _glb_mats[kind]
+	var m := ShaderMaterial.new()
+	var shader_path: String = "res://shaders/rb_fish_glb.gdshader"
+	if kind == "fins":
+		shader_path = "res://shaders/rb_fish_glb_fins.gdshader"
+	elif kind == "lav":
+		shader_path = "res://shaders/rb_fish_glb_lav.gdshader"
+	m.shader = load(shader_path)
+	var tex: String = MODEL_DIR + "textures/fish_w1_"
+	m.set_shader_parameter("albedo_tex", load(tex + "albedo.png"))
+	m.set_shader_parameter("normal_tex", load(tex + "normal.png"))
+	m.set_shader_parameter("orm_tex", load(tex + "orm.png"))
+	m.set_shader_parameter("caustic_tex", load(CAUSTICS))
+	m.set_shader_parameter("use_normal_map", kind != "lav")
+	_glb_mats[kind] = m
+	return m
 
 
 static func _aabb(n: Node, xf: Transform3D) -> AABB:

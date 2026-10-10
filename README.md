@@ -44,7 +44,7 @@ Godot 4.6.2, GDScript with static types, `mobile` renderer, portrait 1080x1920. 
 | `tools/render_sfx.py`, `tools/render_music.py` | Own-synthesis sound effects and the calm music loop |
 | `tools/make_textures.py` | Caustic texture and app icon |
 
-**Fish models.** Put a GLB at `assets/models/fish/<name>.glb` with a name from `RbFishCatalog.SPECIES` (player `golden_trevally`, tiers 1-10 `brisling`, `gronngylt`, `sei`, `berggylt`, `lyr`, `torsk`, `havabbor`, `laks`, `kveite`, `stor_kveite`). The loader scales it to the tier length, centres it and expects the nose toward +X. A node named `Jaw` opens with the mouth cue; an AnimationPlayer's first animation loops. Run with `RB_PROXY_FISH=1` to force the proxies.
+**Models.** The sculpted fish (`assets/models/fish/`, player `golden_trevally` plus tiers 1-7) and kelp (`assets/models/kelp/`) load by file name; their contracts are in the READMEs next to them. Fish names per tier live in `RbFishCatalog.SPECIES`; a tier without a GLB (8-10, not reached in world 1) falls back to a procedural proxy. The loader applies `shaders/rb_fish_glb*.gdshader` (swim, jaw, fin flare from the vertex-colour masks) and `rb_kelp_glb.gdshader` (current sway). Lav tier (32-bit devices): body and fins merged into one draw per fish, no normal maps. `RB_PROXY_FISH=1` forces the proxies; `godot --headless -s tests/glb_check.gd` load-checks every GLB.
 
 Checks (run in the game folder, always with `--audio-driver Dummy`):
 

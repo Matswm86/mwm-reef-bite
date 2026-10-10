@@ -19,6 +19,7 @@ const FOG_MID := Color(0.059, 0.329, 0.420)
 const FOG_DEEP := Color(0.024, 0.200, 0.278)
 const PLAY_WATER := Color(0.165, 0.408, 0.459)
 const SUN := Color(1.0, 0.961, 0.859)
+const KELP_DIR := "res://assets/models/kelp/"
 
 var camera: Camera3D
 var env: Environment
@@ -30,6 +31,7 @@ var less_motion: bool = false
 var caustic_tex: Texture2D
 var _kelp_mesh: ArrayMesh
 var _kelp_mat: ShaderMaterial
+var _glb_kelp_mats: Array[ShaderMaterial] = []
 var _patch_mat: ShaderMaterial
 var _patch_root: Node3D
 var _patch_rock_mat: ShaderMaterial
@@ -289,10 +291,10 @@ func _kelp_material(on_plane: bool) -> ShaderMaterial:
 	if on_plane:
 		# Gentle sway so the leaves stay over the safe rect.
 		m.set_shader_parameter("wind_strength", 0.022)
-		m.set_shader_parameter("brightness", 0.82)
-		m.set_shader_parameter("color_bottom", Color(0.30, 0.20, 0.06))
-		m.set_shader_parameter("color_top", Color(0.66, 0.50, 0.18))
-		m.set_shader_parameter("trans_strength", 1.3)
+		m.set_shader_parameter("brightness", 0.8)
+		m.set_shader_parameter("color_bottom", Color(0.26, 0.18, 0.07))
+		m.set_shader_parameter("color_top", Color(0.60, 0.43, 0.17))
+		m.set_shader_parameter("trans_strength", 1.0)
 		m.set_shader_parameter("patch_lush", Color(0.45, 0.33, 0.12))
 		m.set_shader_parameter("patch_dry", Color(0.58, 0.46, 0.20))
 	else:
@@ -311,21 +313,69 @@ func _build_kelp_forest() -> void:
 	_kelp_mat = _kelp_material(false)
 	var near: int = 42 if low else 70
 	var far: int = 60 if low else 130
-	var near_xf: Array[Transform3D] = []
+	# Sculpted kelp (assets/models/kelp/README.md) when present, else the
+	# procedural frond. Two near meshes (a, b) and the light far strand.
+	var near_meshes: Array[Mesh] = []
+	for n: String in ["kelp_giant_a", "kelp_giant_b"]:
+		var m: Mesh = _glb_mesh(KELP_DIR + n + ".glb")
+		if m != null:
+			near_meshes.append(m)
+	var far_mesh: Mesh = _glb_mesh(KELP_DIR + "kelp_giant_far.glb")
+	var use_glb: bool = near_meshes.size() == 2 and far_mesh != null
+	var near_xf: Array = [[], []]
 	for i: int in near:
 		var z: float = _rng.randf_range(-10.0, -2.5)
 		var half: float = (CAM_DIST - z) * 0.2025 + 0.6
 		var side: float = 1.0 if i % 2 == 0 else -1.0
 		var x: float = side * _rng.randf_range(1.6, half)
-		near_xf.append(_kelp_xf(x, z, _rng.randf_range(4.2, 6.6)))
-	var far_xf: Array[Transform3D] = []
+		var h: float = _rng.randf_range(0.85, 1.2) if use_glb else _rng.randf_range(4.2, 6.6)
+		(near_xf[(i / 2) % 2 if use_glb else 0] as Array).append(_kelp_xf(x, z, h))
+	var far_xf: Array = []
 	for i: int in far:
 		var z: float = _rng.randf_range(-30.0, -10.0)
 		var half: float = (CAM_DIST - z) * 0.2025 + 1.0
 		var x: float = _rng.randf_range(-half, half)
-		far_xf.append(_kelp_xf(x, z, _rng.randf_range(5.0, 8.0)))
-	add_child(_kelp_mmi(near_xf, _kelp_mat))
-	add_child(_kelp_mmi(far_xf, _kelp_mat))
+		var h2: float = _rng.randf_range(0.85, 1.2) if use_glb else _rng.randf_range(5.0, 8.0)
+		far_xf.append(_kelp_xf(x, z, h2))
+	if use_glb:
+		var mat: ShaderMaterial = _kelp_glb_material(0.06, 0.8)
+		add_child(_kelp_mmi(near_xf[0], mat, near_meshes[0]))
+		add_child(_kelp_mmi(near_xf[1], mat, near_meshes[1]))
+		add_child(_kelp_mmi(far_xf, mat, far_mesh))
+	else:
+		add_child(_kelp_mmi(near_xf[0], _kelp_mat, _kelp_mesh))
+		add_child(_kelp_mmi(far_xf, _kelp_mat, _kelp_mesh))
+
+
+## First mesh of a GLB scene, or null when the file is not there.
+func _glb_mesh(path: String) -> Mesh:
+	if not RbFishCatalog.use_models or not ResourceLoader.exists(path):
+		return null
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return null
+	var inst: Node = scene.instantiate()
+	var found: Mesh = null
+	for c: Node in inst.find_children("*", "MeshInstance3D", true, false):
+		found = (c as MeshInstance3D).mesh
+		break
+	inst.free()
+	return found
+
+
+func _kelp_glb_material(strength: float, brightness: float) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = load("res://shaders/rb_kelp_glb.gdshader")
+	var tex: String = KELP_DIR + "textures/kelp_w1_"
+	m.set_shader_parameter("albedo_tex", load(tex + "albedo.png"))
+	m.set_shader_parameter("normal_tex", load(tex + "normal.png"))
+	m.set_shader_parameter("orm_tex", load(tex + "orm.png"))
+	m.set_shader_parameter("use_normal_map", not low)
+	m.set_shader_parameter("strength", strength)
+	m.set_shader_parameter("brightness", brightness)
+	m.set_meta(&"strength", strength)
+	_glb_kelp_mats.append(m)
+	return m
 
 
 func _kelp_xf(x: float, z: float, h: float) -> Transform3D:
@@ -333,10 +383,10 @@ func _kelp_xf(x: float, z: float, h: float) -> Transform3D:
 	return Transform3D(b, Vector3(x, FLOOR_Y - 0.05, z))
 
 
-func _kelp_mmi(xfs: Array[Transform3D], mat: ShaderMaterial) -> MultiMeshInstance3D:
+func _kelp_mmi(xfs: Array, mat: ShaderMaterial, mesh: Mesh) -> MultiMeshInstance3D:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = _kelp_mesh
+	mm.mesh = mesh
 	mm.instance_count = xfs.size()
 	for i: int in xfs.size():
 		mm.set_instance_transform(i, xfs[i])
@@ -367,6 +417,10 @@ func _blade_mesh() -> ArrayMesh:
 
 
 func _build_seagrass() -> void:
+	var tuft_mesh: Mesh = _glb_mesh(KELP_DIR + "seagrass_tuft.glb")
+	if tuft_mesh != null:
+		_build_seagrass_glb(tuft_mesh)
+		return
 	var n: int = 800 if low else 2000
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -405,6 +459,35 @@ func _build_seagrass() -> void:
 	mmi.material_override = m
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mmi)
+
+
+## Sculpted eelgrass tufts (9 blades each) plus, on Høy, a few sugar-kelp
+## clumps on the sand at the sides.
+func _build_seagrass_glb(tuft_mesh: Mesh) -> void:
+	var n: int = 90 if low else 220
+	var xfs: Array = []
+	for i: int in n:
+		var cz: float = _rng.randf_range(-14.0, 1.8)
+		var half: float = (CAM_DIST - cz) * 0.2025 + 0.5
+		var p := Vector3(_rng.randf_range(-half, half), FLOOR_Y + 0.02, cz)
+		var sc: float = _rng.randf_range(0.8, 1.25)
+		xfs.append(
+			Transform3D(Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(sc, sc, sc)), p)
+		)
+	add_child(_kelp_mmi(xfs, _kelp_glb_material(0.03, 0.75), tuft_mesh))
+	var sugar: Mesh = _glb_mesh(KELP_DIR + "kelp_sugar.glb")
+	if sugar == null or low:
+		return
+	var sx: Array = []
+	for i: int in 10:
+		var z: float = _rng.randf_range(-9.0, 0.5)
+		var half2: float = (CAM_DIST - z) * 0.2025
+		var side: float = 1.0 if i % 2 == 0 else -1.0
+		var x: float = side * _rng.randf_range(half2 * 0.45, half2 + 0.3)
+		var sc2: float = _rng.randf_range(0.85, 1.2)
+		var b := Basis(Vector3.UP, _rng.randf_range(-0.5, 0.5)).scaled(Vector3(sc2, sc2, sc2))
+		sx.append(Transform3D(b, Vector3(x, FLOOR_Y + 0.02, z)))
+	add_child(_kelp_mmi(sx, _kelp_glb_material(0.04, 0.8), sugar))
 
 
 func _build_surface() -> void:
@@ -749,6 +832,10 @@ func set_less_motion(on: bool) -> void:
 	_rays_mat.set_shader_parameter("motion", motion)
 	_school_mat.set_shader_parameter("motion", motion)
 	_kelp_mat.set_shader_parameter("sway_scale", 0.5 if on else 1.0)
+	for m: ShaderMaterial in _glb_kelp_mats:
+		m.set_shader_parameter(
+			"strength", float(m.get_meta(&"strength", 0.06)) * (0.5 if on else 1.0)
+		)
 	_patch_mat.set_shader_parameter("sway_scale", 0.5 if on else 1.0)
 	_snow.emitting = not on
 	_snow.visible = not on
