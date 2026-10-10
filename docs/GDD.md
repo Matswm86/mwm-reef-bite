@@ -101,10 +101,12 @@ Holdover filter: ignore all touches for 300 ms after any screen change (rule 8).
 
 ### 4.1 Player motion
 
-- Max speed `PLAYER_SPEED`: Lett 380 px/s, Vanlig 440 px/s.
-- Wanted velocity = direction to the aim point x min(max speed, distance x 4.0 /s), so the fish slows smoothly over the last 95-110 px and never overshoots.
-- Actual velocity eases toward the wanted velocity with time constant `STEER_TAU` (Lett 0.18 s, Vanlig 0.14 s): responsive, but a jerky finger gives a smooth fish.
-- The fish faces left or right by the sign of its x velocity (flip takes 120 ms, a turn animation) and tilts up to 25 degrees with its y velocity.
+Owner phone test 2026-10-10: softer controls (the fish was too rapid for a child to follow; was 380 / 440 px/s, tau 0.18 / 0.14 s, gain 4.0, no acceleration cap, 120 ms flip).
+
+- Max speed `PLAYER_SPEED`: Lett 220 px/s, Vanlig 280 px/s.
+- Wanted velocity = direction to the aim point x min(max speed, (distance - 28 px) x 2.0 /s). Inside the 28 px `ARRIVE_DEADZONE` the fish wants to stop, so it settles under the finger instead of jittering; it slows over the last 140-170 px.
+- Actual velocity eases toward the wanted velocity with time constant `STEER_TAU` (Lett 0.45 s, Vanlig 0.40 s), and the change per second is capped at `PLAYER_ACCEL` (Lett 450, Vanlig 560 px/s²): the fish glides, a full turn-around takes about 0.5 s, and a jerky finger gives a calm fish. Any overshoot (about 21 px, designer calc) stays inside the dead zone.
+- The fish faces left or right by the sign of its x velocity and tilts up to 25 degrees with its y velocity. The player's turn-around eases in and out over 250 ms (`PLAYER_TURN_S`); other fish flip in 120 ms.
 - The player stays inside the pond with its body radius as margin. Pond edges are soft: no wrapping (my call).
 
 ### 4.2 Size tiers and the eat rule
@@ -148,7 +150,7 @@ graphic-designer may add colour to the rings (DESIGN.md), but the shapes carry t
 | Lett: 3 + 2t | 7 | 9 | 11 | 13 | 15 | 17 | 19 |
 | Vanlig: 3 + t | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
 
-- Lett needs more points but its fish mix is 70% edible and nothing chases, so a level is longer to play but never tense. Vanlig needs fewer points because every extra meal is a risk; levels end in under about 1 minute (designer calc, 6.3).
+- Lett needs more points but its fish mix is 70% edible and nothing chases, so a level is longer to play but never tense. Vanlig needs fewer points because every extra meal is a risk; levels end in about 1-1.5 minutes (designer calc, 6.3, after the 2026-10-10 softer controls).
 - Overflow carries over; a meal can grow the player more than once.
 - **Growth moment:** the body pops to the new length over 0.35 s (ease-out with a 6% overshoot), a ring of bubbles bursts out, a rising chime plays, and the player gets 0.6 s of catch immunity. The meter's next silhouette fills in (8.2).
 
@@ -166,13 +168,13 @@ graphic-designer may add colour to the rings (DESIGN.md), but the shapes carry t
 | Breathers (both) | +10 points to edible, taken from bigger | | |
 
 - Level 1 spawns no bigger fish at all. **Anti-starve:** while fewer than 3 edible fish are on screen, the next spawn is always edible. Max tier on screen: 10.
-- Fish speed (px/s) = (70 + 12 x tier) x random 0.75-1.25 x `FISH_SPEED_MULT` (Lett 0.75, Vanlig 1.0) x the world speed (6.3). Example: a tier-3 fish in world 1 swims 60-99 px/s in Lett and 80-133 px/s in Vanlig.
+- Fish speed (px/s) = (70 + 12 x tier) x random 0.75-1.25 x `FISH_SPEED_MULT` (Lett 0.55, Vanlig 0.8; was 0.75 / 1.0 before the 2026-10-10 softer controls) x the world speed (6.3). Example: a tier-3 fish in world 1 swims 44-73 px/s in Lett and 64-106 px/s in Vanlig.
 - Species per tier and world (realistic fish, e.g. reke / sild / makrell / torsk / laks / kveite) are graphic-designer's call; one rule from me: **one species per tier inside a world**, so a child learns "the striped ones are my size" (shape and pattern cue, rule 36).
 
 ### 4.6 Fish behaviour
 
 - **Lett:** no fish chases and no fish flees. Bigger fish just cruise. A catch only happens when the player swims into a big fish's mouth.
-- **Vanlig:** a bigger fish within `CHASE_RADIUS` 220 px turns toward the player and chases at 0.5 x the player's max speed (220 px/s) for at most 2.0 s, then gives up and resumes its course (each fish chases once). The player can always outswim a chaser. An edible fish within 200 px darts away at 1.3x its speed for up to 1.0 s.
+- **Vanlig:** a bigger fish within `CHASE_RADIUS` 220 px turns toward the player and chases at 0.4 x the player's max speed (112 px/s) for at most 2.0 s, then gives up and resumes its course (each fish chases once). The player can always outswim a chaser. An edible fish within 200 px darts away at 1.1x its speed for up to 1.0 s.
 - Fish do not eat each other (my call; keeps the pond count predictable and avoids sad moments).
 
 ### 4.7 Being caught: the gentle mechanic
@@ -203,7 +205,7 @@ Every element has a shape or motion cue (rule 36). Names are Norwegian first; co
 | **Kulefisk / Pufferfish** | Round body; puffs into a spiky ball | Swims at 60 px/s, tier P-1 when relaxed (edible). When the player comes within 220 px (Lett 160), it puffs over 0.3 s to 2x radius with spikes. Puffed: touching it bounces the player back 200 px over 0.3 s with a "boing", **no catch, no cost** in either setting. Stays puffed 2.5 s (Lett 2.0 s), deflates over 0.5 s; edible again once deflated. Teaches "wait, then eat". Puffing is announced by a 0.3 s inflate sound, never instant | 2 on screen | 2-3 on screen | 6 |
 | **Manet / Jellyfish** | Bell with trailing threads, slow pulse | Drifts up and down at 40 px/s (bob amplitude 120 px), never eaten, never eats. Touching it: a soft **tingle**, the player is stunned for 0.4 s (Vanlig 0.6 s) and pushed 80 px away. No cost. Other fish pass through jellies | 2 | 3 | 11 |
 | **Ål / Eel** | Long body in a hole; glowing eyes before it strikes | Lives in 2-3 fixed holes on the pond sides (wreck portholes, rocks). Every 5-8 s one eel **peeks**: eyes glow for 1.5 s (Vanlig 1.0 s), then it darts straight out 240 px (Vanlig 320 px) and back, 1.2 s total. The eel counts as a bigger fish (catch rules, gentle mechanic). Never chases | 2 holes | 3 holes | 16 |
-| **Strøm / Current** | Horizontal band 200 px tall with slow streak lines and chevrons pointing the way (static low-contrast pattern scrolling at the current speed, rule 38) | Pushes everything inside it (player, fish, pearls stay put) at 100 px/s (Vanlig 140 px/s) in the chevron direction. Player can always swim against it (380 > 100) | 1 band | 2 bands | 21 |
+| **Strøm / Current** | Horizontal band 200 px tall with slow streak lines and chevrons pointing the way (static low-contrast pattern scrolling at the current speed, rule 38) | Pushes everything inside it (player, fish, pearls stay put) at 100 px/s (Vanlig 140 px/s) in the chevron direction. Player can always swim against it (220 > 100) | 1 band | 2 bands | 21 |
 | **Breiflabb / Anglerfish** | Big flat fish on the floor or a ledge, a lure light dangling in front | Never moves except to strike. If the player's centre comes within 180 px of the lure, the lure blinks twice over 1.2 s (Vanlig 0.8 s; 2 blinks in 0.8 s = 2.5 per s, under the 3 flash limit) and the angler lunges 200 px toward the lure and back (0.6 s). Counts as a bigger fish. The lure looks a bit like a pearl: in pearl levels, pearls never spawn within 250 px of a lure | 1 | 2 | 26 |
 
 ### 5.2 Friends (one new per world, introduced on that world's L4 or with its goal level)
@@ -255,42 +257,42 @@ Names are my suggestions (Norwegian, the setting is graphic-designer's): realist
 
 Columns: goal (Vokse = tier to reach from tier 2, Perler = pearl count, Glitter = glitter fish count); fish = `FISH_MAX`; speed = world speed multiplier; extras = hazards, friends and power-ups present. Vanlig bobler: 3 everywhere except world 1 and breathers (unlimited).
 
-Sim columns (designer calc, `python3 tools/pacing_sim.py table -n 40`, 2026-10-10, 40 runs per level and setting): median clear time of the bot, Lett mean catches per level, Vanlig share of attempts with at least one gentle restart. All 60 rows cleared in 40 of 40 runs. **The sim plays an open pond with plain fish only: no hazards, friends, power-ups, currents, pre-placed start fish or same-tier bumps** (power-ups and friends mostly help, hazards cost time), so rows with extras are approximations. The bot never hesitates, misreads or wanders off for long; **treat every time as a floor**, a real 4-year-old will likely take 1.5-3x longer.
+Sim columns (designer calc, `python3 tools/pacing_sim.py table -n 40`, re-run 2026-10-10 after the owner phone test's softer controls, 40 runs per level and setting): median clear time of the bot, Lett mean catches per level, Vanlig share of attempts with at least one gentle restart. 59 of 60 rows cleared in 40 of 40 runs; L28 Vanlig cleared 39 of 40. **The sim plays an open pond with plain fish only: no hazards, friends, power-ups, currents, pre-placed start fish or same-tier bumps** (power-ups and friends mostly help, hazards cost time), so rows with extras are approximations. The bot never hesitates, misreads or wanders off for long; **treat every time as a floor**, a real 4-year-old will likely take 1.5-3x longer.
 
 | # | W | Name | New / focus | Goal Lett / Vanlig | Fish L / V | Speed | Extras | Sim Lett median / catches | Sim Vanlig median / restart |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | 1 | Første munnfull | Steer and eat (no bigger fish) | Vokse 3 / 4 | 7 / 8 | 1.00 | | 13 s / 0.0 | 21 s / 0 |
-| 2 | 1 | Større fisker | Bigger fish, the cues | Vokse 4 / 5 | 7 / 9 | 1.00 | | 31 s / 0.1 | 46 s / 0 |
-| 3 | 1 | Bobla | Bubble shield | Vokse 4 / 5 | 7 / 9 | 1.00 | Bobla | 32 s / 0.3 | 45 s / 0 |
-| 4 | 1 | Gjemmeleken | Kelp, first pearl goal | Perler 4 / 6 | 7 / 9 | 1.00 | 3 Tare | 20 s / 0.1 | 22 s / 0 |
-| 5 | 1 | Solstriper | Breather | Vokse 4 / 5 | 7 / 8 | 1.00 | 2 Tare | 30 s / 0.2 | 37 s / 0 |
-| 6 | 2 | Kulefisken | Pufferfish | Vokse 5 / 6 | 8 / 10 | 1.05 | 2 / 3 Kulefisk | 39 s / 0.3 | 48 s / 22% |
-| 7 | 2 | Perlerevet | Pearls among puffers | Perler 5 / 8 | 8 / 10 | 1.05 | 2 / 3 Kulefisk | 23 s / 0.2 | 33 s / 18% |
-| 8 | 2 | Turbofinnen | Turbo fin | Vokse 5 / 6 | 8 / 10 | 1.05 | Turbofinne, 1 / 2 Kulefisk | 40 s / 0.3 | 49 s / 22% |
-| 9 | 2 | Skilpadden | Turtle + combine | Vokse 5 / 7 | 8 / 10 | 1.08 | Skilpadde, 2 / 3 Kulefisk, Bobla | 44 s / 0.4 | 51 s / 38% |
-| 10 | 2 | Korallhagen | Breather | Vokse 5 / 6 | 8 / 9 | 1.00 | Skilpadde | 40 s / 0.2 | 39 s / 0 |
-| 11 | 3 | Manetene | Jellyfish | Vokse 5 / 6 | 8 / 11 | 1.08 | 2 / 3 Manet | 41 s / 0.6 | 49 s / 15% |
-| 12 | 3 | Sjøhesten | Seahorse, pearls | Perler 6 / 9 | 8 / 11 | 1.08 | Sjøhest, 2 / 3 Manet | 30 s / 0.3 | 37 s / 18% |
-| 13 | 3 | Slurp | Slurp mouth | Vokse 6 / 7 | 9 / 11 | 1.10 | Slurp, 2 / 3 Manet | 46 s / 0.3 | 57 s / 30% |
-| 14 | 3 | Pigger og manet | Combine | Vokse 6 / 7 | 9 / 11 | 1.12 | 2 Manet, 2 Kulefisk, Turbofinne | 48 s / 0.5 | 53 s / 28% |
-| 15 | 3 | Månelys | Breather | Vokse 5 / 6 | 8 / 10 | 1.05 | 1 Manet, Slurp | 38 s / 0.2 | 40 s / 0 |
-| 16 | 4 | Ålen | Eel | Vokse 6 / 7 | 9 / 11 | 1.12 | 2 / 3 Ål-hull | 48 s / 0.6 | 56 s / 30% |
-| 17 | 4 | Glitterfisken | Glitter goal | Glitter 3 / 4 | 9 / 12 | 1.12 | 2 Ål-hull | 18 s / 0.2 | 31 s / 15% |
-| 18 | 4 | Bobletårnet | Bubble column, pearls | Perler 7 / 10 | 9 / 12 | 1.14 | 2 Boblesøyle, 2 / 3 Ål-hull | 33 s / 0.4 | 49 s / 35% |
-| 19 | 4 | Vraket | Combine | Vokse 6 / 8 | 9 / 11 | 1.16 | Ål, Boblesøyle, 2 Kulefisk, Bobla | 49 s / 0.5 | 55 s / 30% |
-| 20 | 4 | Skattekisten | Breather | Vokse 6 / 7 | 9 / 11 | 1.08 | 1 Boblesøyle, Slurp | 46 s / 0.2 | 47 s / 0 |
-| 21 | 5 | Strømmen | Current | Vokse 6 / 8 | 10 / 12 | 1.16 | 1 / 2 Strøm | 47 s / 0.8 | 59 s / 42% |
-| 22 | 5 | Glitter i strømmen | Glitter + current | Glitter 4 / 5 | 10 / 12 | 1.16 | 1 / 2 Strøm, Turbofinne | 24 s / 0.3 | 31 s / 20% |
-| 23 | 5 | Hvalen | Whale | Vokse 7 / 8 | 10 / 13 | 1.18 | Hval, 1 Strøm | 50 s / 0.4 | 54 s / 28% |
-| 24 | 5 | Villstrøm | Combine | Vokse 7 / 8 | 10 / 13 | 1.20 | 2 Strøm, 2 Manet, 2 Ål-hull, Bobla | 50 s / 0.3 | 58 s / 35% |
-| 25 | 5 | Nordlys | Breather | Vokse 6 / 7 | 9 / 12 | 1.12 | Hval | 44 s / 0.2 | 46 s / 0 |
-| 26 | 6 | Breiflabben | Anglerfish | Vokse 7 / 8 | 10 / 13 | 1.20 | 1 / 2 Breiflabb | 51 s / 0.5 | 58 s / 38% |
-| 27 | 6 | Lysfiskene | Lantern fish, pearls | Perler 8 / 10 | 10 / 13 | 1.20 | Lysfisk, 1 / 2 Breiflabb, Sjøhest | 38 s / 0.2 | 48 s / 40% |
-| 28 | 6 | Dypglitter | Glitter in the deep | Glitter 5 / 6 | 10 / 14 | 1.22 | Lysfisk, 1 Breiflabb, 2 Manet, Slurp | 27 s / 0.3 | 44 s / 32% |
-| 29 | 6 | Alt på en gang | Everything | Vokse 7 / 9 | 10 / 13 | 1.25 | Breiflabb, Ål, Kulefisk, Strøm, Lysfisk, Bobla | 51 s / 0.5 | 65 s / 48% |
-| 30 | 6 | Havets største | Finale: become the biggest | Vokse 8 / 9 | 10 / 13 | 1.15 | Lysfisk, Hval, Bobla + Slurp | 53 s / 0.2 | 50 s / 0 |
+| 1 | 1 | Første munnfull | Steer and eat (no bigger fish) | Vokse 3 / 4 | 7 / 8 | 1.00 | | 23 s / 0.0 | 27 s / 0 |
+| 2 | 1 | Større fisker | Bigger fish, the cues | Vokse 4 / 5 | 7 / 9 | 1.00 | | 50 s / 0.2 | 54 s / 0 |
+| 3 | 1 | Bobla | Bubble shield | Vokse 4 / 5 | 7 / 9 | 1.00 | Bobla | 52 s / 0.5 | 55 s / 0 |
+| 4 | 1 | Gjemmeleken | Kelp, first pearl goal | Perler 4 / 6 | 7 / 9 | 1.00 | 3 Tare | 26 s / 0.1 | 30 s / 0 |
+| 5 | 1 | Solstriper | Breather | Vokse 4 / 5 | 7 / 8 | 1.00 | 2 Tare | 47 s / 0.1 | 45 s / 0 |
+| 6 | 2 | Kulefisken | Pufferfish | Vokse 5 / 6 | 8 / 10 | 1.05 | 2 / 3 Kulefisk | 67 s / 0.3 | 65 s / 12% |
+| 7 | 2 | Perlerevet | Pearls among puffers | Perler 5 / 8 | 8 / 10 | 1.05 | 2 / 3 Kulefisk | 33 s / 0.1 | 42 s / 5% |
+| 8 | 2 | Turbofinnen | Turbo fin | Vokse 5 / 6 | 8 / 10 | 1.05 | Turbofinne, 1 / 2 Kulefisk | 65 s / 0.3 | 64 s / 15% |
+| 9 | 2 | Skilpadden | Turtle + combine | Vokse 5 / 7 | 8 / 10 | 1.08 | Skilpadde, 2 / 3 Kulefisk, Bobla | 71 s / 0.5 | 72 s / 12% |
+| 10 | 2 | Korallhagen | Breather | Vokse 5 / 6 | 8 / 9 | 1.00 | Skilpadde | 63 s / 0.4 | 54 s / 0 |
+| 11 | 3 | Manetene | Jellyfish | Vokse 5 / 6 | 8 / 11 | 1.08 | 2 / 3 Manet | 67 s / 0.4 | 67 s / 12% |
+| 12 | 3 | Sjøhesten | Seahorse, pearls | Perler 6 / 9 | 8 / 11 | 1.08 | Sjøhest, 2 / 3 Manet | 41 s / 0.1 | 50 s / 2% |
+| 13 | 3 | Slurp | Slurp mouth | Vokse 6 / 7 | 9 / 11 | 1.10 | Slurp, 2 / 3 Manet | 74 s / 0.3 | 77 s / 22% |
+| 14 | 3 | Pigger og manet | Combine | Vokse 6 / 7 | 9 / 11 | 1.12 | 2 Manet, 2 Kulefisk, Turbofinne | 73 s / 0.4 | 67 s / 20% |
+| 15 | 3 | Månelys | Breather | Vokse 5 / 6 | 8 / 10 | 1.05 | 1 Manet, Slurp | 60 s / 0.2 | 55 s / 0 |
+| 16 | 4 | Ålen | Eel | Vokse 6 / 7 | 9 / 11 | 1.12 | 2 / 3 Ål-hull | 79 s / 0.4 | 72 s / 15% |
+| 17 | 4 | Glitterfisken | Glitter goal | Glitter 3 / 4 | 9 / 12 | 1.12 | 2 Ål-hull | 27 s / 0.1 | 39 s / 5% |
+| 18 | 4 | Bobletårnet | Bubble column, pearls | Perler 7 / 10 | 9 / 12 | 1.14 | 2 Boblesøyle, 2 / 3 Ål-hull | 46 s / 0.2 | 59 s / 15% |
+| 19 | 4 | Vraket | Combine | Vokse 6 / 8 | 9 / 11 | 1.16 | Ål, Boblesøyle, 2 Kulefisk, Bobla | 74 s / 0.3 | 80 s / 10% |
+| 20 | 4 | Skattekisten | Breather | Vokse 6 / 7 | 9 / 11 | 1.08 | 1 Boblesøyle, Slurp | 70 s / 0.1 | 61 s / 0 |
+| 21 | 5 | Strømmen | Current | Vokse 6 / 8 | 10 / 12 | 1.16 | 1 / 2 Strøm | 76 s / 0.5 | 79 s / 30% |
+| 22 | 5 | Glitter i strømmen | Glitter + current | Glitter 4 / 5 | 10 / 12 | 1.16 | 1 / 2 Strøm, Turbofinne | 32 s / 0.3 | 45 s / 0 |
+| 23 | 5 | Hvalen | Whale | Vokse 7 / 8 | 10 / 13 | 1.18 | Hval, 1 Strøm | 77 s / 0.5 | 77 s / 25% |
+| 24 | 5 | Villstrøm | Combine | Vokse 7 / 8 | 10 / 13 | 1.20 | 2 Strøm, 2 Manet, 2 Ål-hull, Bobla | 80 s / 0.5 | 75 s / 18% |
+| 25 | 5 | Nordlys | Breather | Vokse 6 / 7 | 9 / 12 | 1.12 | Hval | 70 s / 0.0 | 64 s / 0 |
+| 26 | 6 | Breiflabben | Anglerfish | Vokse 7 / 8 | 10 / 13 | 1.20 | 1 / 2 Breiflabb | 81 s / 0.4 | 83 s / 28% |
+| 27 | 6 | Lysfiskene | Lantern fish, pearls | Perler 8 / 10 | 10 / 13 | 1.20 | Lysfisk, 1 / 2 Breiflabb, Sjøhest | 54 s / 0.5 | 60 s / 18% |
+| 28 | 6 | Dypglitter | Glitter in the deep | Glitter 5 / 6 | 10 / 14 | 1.22 | Lysfisk, 1 Breiflabb, 2 Manet, Slurp | 40 s / 0.2 | 72 s / 18% |
+| 29 | 6 | Alt på en gang | Everything | Vokse 7 / 9 | 10 / 13 | 1.25 | Breiflabb, Ål, Kulefisk, Strøm, Lysfisk, Bobla | 82 s / 0.3 | 85 s / 18% |
+| 30 | 6 | Havets største | Finale: become the biggest | Vokse 8 / 9 | 10 / 13 | 1.15 | Lysfisk, Hval, Bobla + Slurp | 79 s / 0.1 | 68 s / 0 |
 
-"x / y" in extras = Lett count / Vanlig count. **Reading:** Lett bot medians climb from 13 s to about 50 s and Lett catches stay under 1 per level (bigger fish are a nuisance, not a wall). Vanlig medians stay at 21-65 s; restarts stay at or under about 1 in 3 except L21, L27 and L29 (40-48%, the hardest levels; open question 4). Breathers and world 1 never restart (unlimited bobler).
+"x / y" in extras = Lett count / Vanlig count. **Reading:** Lett bot medians climb from 23 s to about 80 s and Lett catches stay under 1 per level (bigger fish are a nuisance, not a wall). Vanlig medians stay at 27-85 s; restarts stay at or under 30% everywhere (before the softer controls: 13-65 s and up to 48%; the slower, calmer fish makes levels longer, not harder). Breathers and world 1 never restart (unlimited bobler).
 
 Level 30's win card gets a longer finale (section 9): the player swims a lap as the biggest fish while every fish in the pond turns to look.
 
@@ -323,18 +325,18 @@ Pond rect x 0-1080, y 256-1640. Positions are centres in logic px.
 | Power-ups | Bobla from round 2, one random unlocked power-up from round 4 | same |
 | Bobler | none (catches cost nothing) | 3, refilled at every round start |
 
-At the caps the round values stop growing; rounds keep counting. Sim (bot medians, 30 runs per round, open pond, designer calc):
+At the caps the round values stop growing; rounds keep counting. Sim (bot medians, 30 runs per round, open pond, designer calc, re-run 2026-10-10 with the softer controls):
 
 | Round | Lett goal / fish / speed: median | Vanlig goal / fish / speed: median / restart |
 |---|---|---|
-| 1 | 4 / 7 / x1.00: 33 s | 5 / 9 / x1.00: 40 s / 20% |
-| 3 | 6 / 8 / x1.06: 47 s | 7 / 10 / x1.06: 54 s / 27% |
-| 5 | 8 / 9 / x1.12: 57 s | 9 / 11 / x1.12: 58 s / 27% |
-| 7 | 8 / 10 / x1.18: 54 s | 9 / 12 / x1.18: 66 s / 40% |
-| 9 | 8 / 10 / x1.24: 57 s | 9 / 13 / x1.24: 74 s / 47% |
-| 12 | 8 / 10 / x1.24: 53 s | 9 / 13 / x1.24: 65 s / 37% |
+| 1 | 4 / 7 / x1.00: 50 s | 5 / 9 / x1.00: 53 s / 3% |
+| 3 | 6 / 8 / x1.06: 76 s | 7 / 10 / x1.06: 68 s / 7% |
+| 5 | 8 / 9 / x1.12: 95 s | 9 / 11 / x1.12: 78 s / 7% |
+| 7 | 8 / 10 / x1.18: 84 s | 9 / 12 / x1.18: 78 s / 10% |
+| 9 | 8 / 10 / x1.24: 88 s | 9 / 13 / x1.24: 84 s / 23% |
+| 12 | 8 / 10 / x1.24: 89 s | 9 / 13 / x1.24: 77 s / 13% |
 
-A bot run to round 12 takes about 10 minutes (Lett) or 12 minutes (Vanlig) of play (sum of medians, designer calc), so the best round grows over several sittings. A plain "more fish" ramp did nothing in Lett (more fish = more food, round times fell from 50 to 43 s, designer calc), which is why the goal tier climbs first.
+A bot run to round 12 takes about 16 minutes (Lett) or 15 minutes (Vanlig) of play (sum of medians, designer calc), so the best round grows over several sittings. A plain "more fish" ramp did nothing in Lett (more fish = more food, round times fell from 50 to 43 s, designer calc), which is why the goal tier climbs first.
 
 **No game over:** Lett catches cost nothing. Vanlig: empty bobler plus a catch restarts **the same round** (4.7); the round number never goes down. The only way out is the home disc / Android back, which ends the run (quitting costs nothing, rule 28).
 
@@ -356,9 +358,12 @@ All tunables live in one const block or data file (studio rule).
 | `TIER_LEN` | 72 x 1.28^(t-1): 72, 92, 118, 151, 193, 247, 317, 405, 519, 664 | same | px | Tier 1-10 |
 | `BODY_R` | 0.30 x length | same | | Collision circle |
 | `PLAYER_START_TIER` | 2 | 2 | | Every level and round |
-| `PLAYER_SPEED` | 380 | 440 | px/s | |
-| `STEER_TAU` | 0.18 | 0.14 | s | Velocity easing |
-| `ARRIVE_GAIN` | 4.0 | 4.0 | 1/s | Wanted speed = min(max, distance x gain) |
+| `PLAYER_SPEED` | 220 | 280 | px/s | Owner phone test 2026-10-10: softer controls |
+| `STEER_TAU` | 0.45 | 0.40 | s | Velocity easing |
+| `PLAYER_ACCEL` | 450 | 560 | px/s² | Cap on the velocity change |
+| `ARRIVE_GAIN` | 2.0 | 2.0 | 1/s | Wanted speed = min(max, (distance - dead zone) x gain) |
+| `ARRIVE_DEADZONE` | 28 | 28 | px | Settles under the finger |
+| `PLAYER_TURN_S` | 0.25 | 0.25 | s | Eased turn-around (other fish 0.12) |
 | `FINGER_LIFT` | 120, fading to 0 between finger y 1400 and 1640 | same | px | Aim point above the fingertip |
 | `EAT_REACH` | 36 | 18 | px | Mouth magnet |
 | `CATCH_SCALE` | 0.70 | 0.75 | | On (big r x 0.8 + player r x 0.5) |
@@ -371,10 +376,10 @@ All tunables live in one const block or data file (studio rule).
 | `EDIBLE_TIER_WEIGHT` | P-3 : P-2 : P-1 = 1 : 2 : 3 | same | | Never below tier 1 |
 | `ANTI_STARVE_MIN_EDIBLE` | 3 | 3 | fish | |
 | `SPAWN_INTERVAL` | 0.35 | 0.35 | s | While below `FISH_MAX` |
-| `FISH_SPEED` | (70 + 12t) x U(0.75, 1.25) x 0.75 x world | (70 + 12t) x U(0.75, 1.25) x world | px/s | |
+| `FISH_SPEED` | (70 + 12t) x U(0.75, 1.25) x 0.55 x world | (70 + 12t) x U(0.75, 1.25) x 0.8 x world | px/s | |
 | `FISH_WAVE` | 20 px/s, period about 4 s | same | | Vertical drift |
-| `CHASE_RADIUS / SPEED / TIME` | off | 220 px / 0.5 x player / 2.0 s | | Once per fish |
-| `FLEE_RADIUS / MULT / TIME` | off | 200 px / 1.3 / 1.0 s | | |
+| `CHASE_RADIUS / SPEED / TIME` | off | 220 px / 0.4 x player / 2.0 s | | Once per fish |
+| `FLEE_RADIUS / MULT / TIME` | off | 200 px / 1.1 / 1.0 s | | |
 | `SAME_TIER_PUSH` | 60 px over 0.15 s | same | | |
 | `CATCH_BUBBLE_FLOAT` | 1.4 | 1.4 | s | Burp-out bubble |
 | `CATCH_IMMUNITY` | 2.0 | 2.0 | s | After the bubble pops |
@@ -420,7 +425,7 @@ Same pattern as the sister games: one world per page, the world's underwater sce
 - 0 s: first ever launch skips the map and opens level 1. Player fish at the centre, 3 tiny fish swim nearby. Level intro (9).
 - 1.0 s: a hand icon appears, presses just below the nearest tiny fish, and the player fish swims to it while the hand follows; loops every 2.4 s until the child's first touch. Voice line (when recorded, native Norwegian voice only): "Hold fingeren der du vil svømme" ("Hold your finger where you want to swim"; rule 17).
 - First touch: the fish swims to the finger. Near a tiny fish its mouth opens; first gulp: crunch-free "nam" sound, bubbles, the meter's silhouette fills a little.
-- About 13 s (bot, designer calc; likely 20-40 s for a real 4-year-old): 7 meals, the fish pops to tier 3, goal reached, win card.
+- About 23 s (bot, designer calc, softer controls 2026-10-10; likely 35-70 s for a real 4-year-old): 7 meals, the fish pops to tier 3, goal reached, win card.
 - Level 2: the scripted first bigger fish (6.4) shows the spiky ring and the open mouth. If the child swims into it, the burp-bubble sequence shows that nothing bad happens.
 - **Idle hint** (rule 18): after `HINT_IDLE_S` with no touch, or Lett 3 catches within 15 s, the hand returns and points at the best target: the nearest edible fish (or pearl / glitter fish) whose straight path from the player stays at least 150 px from every bigger fish; if none, the nearest kelp or the pond centre.
 
@@ -507,11 +512,11 @@ Flash safety: a global limiter allows at most 3 bright flashes per second (rule 
 | Aspect | Lett | Vanlig |
 |---|---|---|
 | Caught by a bigger fish | Burped out in a bubble, nothing lost | Burped out, current tier's meter empties, 1 of 3 bobler; empty + catch = gentle restart (W1 and breathers unlimited) |
-| Bigger fish | Never chase | Chase 2 s within 220 px at half player speed |
+| Bigger fish | Never chase | Chase 2 s within 220 px at 0.4 x player speed |
 | Edible fish | Never flee | Dart away within 200 px |
 | Spawn mix | 70% edible, 20% bigger | 60% edible, 30% bigger |
-| Player speed | 380 px/s | 440 px/s |
-| Fish speed | x0.75 | x1.0 |
+| Player speed | 220 px/s (glides) | 280 px/s (glides) |
+| Fish speed | x0.55 | x0.8 |
 | Mouth magnet | 36 px | 18 px |
 | Food per tier | 3 + 2t | 3 + t |
 | Rings | always on | within 420 px |
@@ -520,7 +525,7 @@ Flash safety: a global limiter allows at most 3 bright flashes per second (rule 
 | Hint | after 7 s idle or 3 catches in 15 s | after 12 s idle |
 | Same 30 levels and layouts | yes | yes |
 
-Rule 16 (no reflex demands at the easiest level) holds: in Lett nothing chases, the player is at least 2.9x faster than any fish in world 1 (380 px/s vs at most 133 px/s for the biggest fish that can appear there, tier 6, designer calc), and a catch costs nothing.
+Rule 16 (no reflex demands at the easiest level) holds: in Lett nothing chases, the player is at least 2.2x faster than any fish in world 1 (220 px/s vs at most 98 px/s for the biggest fish that can appear there, tier 6, designer calc), and a catch costs nothing.
 
 ### 10.2 Where the setting lives
 

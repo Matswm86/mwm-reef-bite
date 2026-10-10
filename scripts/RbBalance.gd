@@ -25,17 +25,27 @@ const PLAYER_START_TIER: int = 2
 ## Pearl levels have no tier goal; the player still grows, up to here (my call).
 const PEARL_LEVEL_TIER_CAP: int = 6
 
-## Player motion (GDD 4.1).
-const PLAYER_SPEED_LETT: float = 380.0
-const PLAYER_SPEED_VANLIG: float = 440.0
-const STEER_TAU_LETT: float = 0.18
-const STEER_TAU_VANLIG: float = 0.14
-const ARRIVE_GAIN: float = 4.0
+## Player motion (GDD 4.1). Owner phone test 2026-10-10: softer controls,
+## the fish glides (slower top speed, long smoothing, capped acceleration).
+const PLAYER_SPEED_LETT: float = 220.0
+const PLAYER_SPEED_VANLIG: float = 280.0
+const STEER_TAU_LETT: float = 0.45
+const STEER_TAU_VANLIG: float = 0.40
+## Largest change of velocity per second (px/s^2): a full turn-around takes
+## about half a second instead of a snap.
+const PLAYER_ACCEL_LETT: float = 450.0
+const PLAYER_ACCEL_VANLIG: float = 560.0
+const ARRIVE_GAIN: float = 2.0
+## Inside this distance from the aim point the fish wants to stop, so it
+## settles under the finger instead of jittering.
+const ARRIVE_DEADZONE: float = 28.0
 const FINGER_LIFT: float = 120.0
 const LIFT_FADE_Y0: float = 1400.0
 const LIFT_FADE_Y1: float = 1640.0
 const TILT_MAX_DEG: float = 25.0
 const FLIP_S: float = 0.12
+## The player's turn-around is slower and eased (owner phone test 2026-10-10).
+const PLAYER_TURN_S: float = 0.25
 ## |vx| below this keeps the old facing, so a fish idling on the spot does
 ## not flicker left-right.
 const FACE_DEADBAND: float = 18.0
@@ -81,17 +91,17 @@ const FISH_BASE_SPEED: float = 70.0
 const FISH_SPEED_PER_TIER: float = 12.0
 const FISH_SPEED_RAND_LO: float = 0.75
 const FISH_SPEED_RAND_HI: float = 1.25
-const FISH_SPEED_MULT_LETT: float = 0.75
-const FISH_SPEED_MULT_VANLIG: float = 1.0
+const FISH_SPEED_MULT_LETT: float = 0.55
+const FISH_SPEED_MULT_VANLIG: float = 0.8
 const FISH_WAVE_V: float = 20.0
 const FISH_WAVE_PERIOD: float = 4.0
 
 ## Behaviour, Vanlig only (GDD 4.6).
 const CHASE_RADIUS: float = 220.0
-const CHASE_SPEED_K: float = 0.5
+const CHASE_SPEED_K: float = 0.4
 const CHASE_TIME: float = 2.0
 const FLEE_RADIUS: float = 200.0
-const FLEE_MULT: float = 1.3
+const FLEE_MULT: float = 1.1
 const FLEE_TIME: float = 1.0
 const FLEE_COOLDOWN: float = 1.5
 
@@ -168,6 +178,10 @@ static func player_speed(easy: bool) -> float:
 
 static func steer_tau(easy: bool) -> float:
 	return STEER_TAU_LETT if easy else STEER_TAU_VANLIG
+
+
+static func player_accel(easy: bool) -> float:
+	return PLAYER_ACCEL_LETT if easy else PLAYER_ACCEL_VANLIG
 
 
 static func eat_reach(easy: bool) -> float:

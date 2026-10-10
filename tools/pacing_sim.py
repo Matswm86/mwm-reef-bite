@@ -59,12 +59,20 @@ class Setting:
     respawn_float: float  # Lett: s spent floating as a bubble
     shield_s: float
     bubbles: int  # Vanlig catches allowed before gentle restart (0 = unlimited)
+    accel: float = 1e9  # px/s^2 cap on the velocity change (owner phone test 2026-10-10)
+    arrive_gain: float = 4.0  # 1/s, wanted speed = min(max, (distance - dead zone) x gain)
+    arrive_dz: float = 0.0  # px, dead zone under the finger
+    flee_mult: float = 1.3  # Vanlig flee speed = cruise speed x this
 
 
-LETT = Setting("lett", 380, 0.18, 0.70, 0.10, (1, 1, 2), 0.75, 36, 0.70, False, 0, 0, False,
-               0.6, 1.2, 0.5, 0.25, 70, 3, 2, 1.4, 2.0, 0)
-VANLIG = Setting("vanlig", 440, 0.14, 0.60, 0.10, (1, 1, 2), 1.0, 18, 0.75, True, 220, 0.50, True,
-                 0.4, 0.8, 0.7, 0.10, 50, 3, 1, 1.4, 2.0, 3)
+# Owner phone test 2026-10-10: softer controls (was 380 / 440 px/s, tau 0.18 / 0.14 s, gain 4,
+# fish x0.75 / x1.0, chase 0.50, flee 1.3).
+LETT = Setting("lett", 220, 0.45, 0.70, 0.10, (1, 1, 2), 0.55, 36, 0.70, False, 0, 0, False,
+               0.6, 1.2, 0.5, 0.25, 70, 3, 2, 1.4, 2.0, 0,
+               accel=450, arrive_gain=2.0, arrive_dz=28, flee_mult=1.1)
+VANLIG = Setting("vanlig", 280, 0.40, 0.60, 0.10, (1, 1, 2), 0.8, 18, 0.75, True, 220, 0.40, True,
+                 0.4, 0.8, 0.7, 0.10, 50, 3, 1, 1.4, 2.0, 3,
+                 accel=560, arrive_gain=2.0, arrive_dz=28, flee_mult=1.1)
 
 
 def need(s: Setting, tier: int) -> int:
@@ -184,11 +192,16 @@ def run_level(s: Setting, lvl: Level, seed: int | None = None) -> dict:
         else:
             dx, dy = aim[0] - px, aim[1] - py
             d = math.hypot(dx, dy)
-            want = min(s.player_speed, d * 4.0)  # slows as it reaches the finger
+            # slows as it reaches the finger, stops inside the dead zone
+            want = min(s.player_speed, max(0.0, d - s.arrive_dz) * s.arrive_gain)
             tvx, tvy = (dx / d * want, dy / d * want) if d > 1 else (0.0, 0.0)
             k = 1 - math.exp(-DT / s.steer_tau)
-            vx += (tvx - vx) * k
-            vy += (tvy - vy) * k
+            dvx, dvy = (tvx - vx) * k, (tvy - vy) * k
+            dv = math.hypot(dvx, dvy)
+            if dv > s.accel * DT:
+                dvx, dvy = dvx / dv * s.accel * DT, dvy / dv * s.accel * DT
+            vx += dvx
+            vy += dvy
             px = min(POND_X1 - 30, max(POND_X0 + 30, px + vx * DT))
             py = min(POND_Y1 - 30, max(POND_Y0 + 30, py + vy * DT))
         shield_t = max(0.0, shield_t - DT)
@@ -208,8 +221,8 @@ def run_level(s: Setting, lvl: Level, seed: int | None = None) -> dict:
                 f.y += dy / d * cs * DT
             elif s.flee and f.tier < tier and d < 200 and f.flee_t < 1.0:
                 f.flee_t += DT
-                f.x -= dx / d * base * 1.3 * DT
-                f.y -= dy / d * base * 1.3 * DT
+                f.x -= dx / d * base * s.flee_mult * DT
+                f.y -= dy / d * base * s.flee_mult * DT
             else:
                 f.x += f.vx * DT
                 f.y += math.sin(f.phase) * 20 * DT

@@ -2,10 +2,11 @@ class_name RbFishView
 extends Node3D
 
 ## One fish on the play plane (DESIGN 2, 4): model scaled to its tier
-## length, turns by rotating 180 degrees around Y over 120 ms (never a
-## negative scale), tilts with its vertical speed (max 25 degrees), opens the
-## mouth for the cue (GDD 4.3), pops on growth (GDD 4.4) and squashes on a
-## meal (GDD 9). Works with the proxy mesh and with a dropped-in GLB.
+## length, turns by rotating 180 degrees around Y over 120 ms (the player:
+## eased over 250 ms; never a negative scale), tilts with its vertical
+## speed (max 25 degrees), opens the mouth for the cue (GDD 4.3), pops on
+## growth (GDD 4.4) and squashes on a meal (GDD 9). Works with the proxy
+## mesh and with a dropped-in GLB.
 
 var key: Variant = 1
 var tier: int = 1
@@ -21,7 +22,13 @@ var flash: float = 0.0
 var dim_k: float = 0.0
 ## Sun rim strength (DESIGN 4: the player 0.5+, other fish low). Set before setup().
 var rim: float = 0.15
+## Player only: the turn-around eases in and out over PLAYER_TURN_S instead
+## of the plain 120 ms rotation (owner phone test 2026-10-10).
+var smooth_turn: bool = false
 var _yaw: float = 0.0
+var _yaw_from: float = 0.0
+var _yaw_to: float = 0.0
+var _turn_k: float = 1.0
 var _tilt: float = 0.0
 var _len_now: float = 72.0
 var _len_from: float = 72.0
@@ -81,6 +88,9 @@ func squash() -> void:
 func face_now(f: float) -> void:
 	facing = f
 	_yaw = 0.0 if f > 0.0 else PI
+	_yaw_from = _yaw
+	_yaw_to = _yaw
+	_turn_k = 1.0
 	rotation.y = _yaw
 
 
@@ -91,6 +101,13 @@ func sync(pos: Vector2, vel: Vector2, want_facing: float, delta: float) -> void:
 	var target_yaw: float = 0.0 if facing > 0.0 else PI
 	if less_motion:
 		_yaw = target_yaw
+	elif smooth_turn:
+		if target_yaw != _yaw_to:
+			_yaw_from = _yaw
+			_yaw_to = target_yaw
+			_turn_k = 0.0
+		_turn_k = minf(1.0, _turn_k + delta / RbBalance.PLAYER_TURN_S)
+		_yaw = lerpf(_yaw_from, _yaw_to, smoothstep(0.0, 1.0, _turn_k))
 	else:
 		_yaw = move_toward(_yaw, target_yaw, PI * delta / RbBalance.FLIP_S)
 	var speed: float = maxf(absf(vel.x), 40.0)

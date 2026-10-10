@@ -302,10 +302,11 @@ func _step_player(dt: float) -> void:
 	var to_aim: Vector2 = p_aim - p_pos
 	var dist: float = to_aim.length()
 	var want := Vector2.ZERO
-	if dist > 0.5:
-		want = to_aim / dist * minf(max_v, dist * RbBalance.ARRIVE_GAIN)
+	var eff: float = dist - RbBalance.ARRIVE_DEADZONE
+	if eff > 0.0:
+		want = to_aim / dist * minf(max_v, eff * RbBalance.ARRIVE_GAIN)
 	var k: float = 1.0 - exp(-dt / RbBalance.steer_tau(easy))
-	p_vel += (want - p_vel) * k
+	p_vel += ((want - p_vel) * k).limit_length(RbBalance.player_accel(easy) * dt)
 	p_pos += p_vel * dt
 	if p_bump_t > 0.0:
 		p_bump_t -= dt
