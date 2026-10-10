@@ -3,6 +3,9 @@
 .import/
 *.translation
 *.import
+# World 1 atlases: VRAM compression, mipmaps and size limits must reach CI
+# (DESIGN 4b / 11, QA 2026-10-10 finding 5).
+!assets/models/*/textures/*.png.import
 
 # Mock sources that stay on disk only
 docs/mockups/src/*.blend
