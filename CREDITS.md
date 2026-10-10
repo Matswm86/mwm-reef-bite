@@ -48,4 +48,4 @@ Fish scan sources checked on 2026-10-10 and **not used**:
 - **Poly Pizza**: licences differ per model (some CC0, many CC-BY 3.0 from the old Google Poly set). Brief says CC0 only, and the style is low-poly. Not used.
 - Nothing from `projects/fishy/` (original XGen Flash art, sound, code). See GDD section 0 and 14.
 
-Godot Engine (MIT) and its third-party notices are printed at runtime from `Engine.get_license_text()` and `Engine.get_copyright_info()`, as in the MWM Play shell.
+Godot Engine (MIT) and its third-party notices are shown at runtime on the settings panel ("Lisenser"), built from `Engine.get_license_text()`, `Engine.get_copyright_info()` and `Engine.get_license_info()`, together with the Fredoka OFL text.

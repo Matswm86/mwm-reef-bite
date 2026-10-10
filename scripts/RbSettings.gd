@@ -28,6 +28,9 @@ var _music: Button
 var _motion: Button
 var _sfx_slider: HSlider
 var _music_slider: HSlider
+var _licenses: Button
+var _lic_page: Control
+var _lic_text: Label
 
 
 func _ready() -> void:
@@ -45,6 +48,12 @@ func _ready() -> void:
 	close.position = Vector2(PANEL.end.x - 170, PANEL.position.y + 10)
 	close.tapped.connect(func() -> void: closed.emit())
 	add_child(close)
+	# Adult-only licence page: Godot (MIT) and its third-party notices, the
+	# Fredoka font (OFL), as CREDITS.md promises (QA 2026-10-10 finding 7).
+	_licenses = _button("Lisenser", Rect2(510, 400, 280, 130))
+	_licenses.add_theme_font_size_override("font_size", 40)
+	_style(_licenses, false)
+	_licenses.pressed.connect(_open_licenses)
 	_label("Vanskelighet", Vector2(150, 560))
 	_lett = _button("Lett", Rect2(150, 620, 360, 140))
 	_vanlig = _button("Vanlig", Rect2(570, 620, 360, 140))
@@ -87,12 +96,90 @@ func _ready() -> void:
 	note.add_theme_color_override("font_color", INK)
 	note.position = Vector2(150, 1515)
 	add_child(note)
+	_build_license_page()
 	visible = false
 
 
 func open() -> void:
 	refresh()
+	_lic_page.visible = false
 	visible = true
+
+
+func _build_license_page() -> void:
+	_lic_page = Control.new()
+	_lic_page.size = size
+	_lic_page.mouse_filter = Control.MOUSE_FILTER_STOP
+	_lic_page.draw.connect(
+		func() -> void:
+			var sb := StyleBoxFlat.new()
+			sb.bg_color = CARD
+			sb.border_color = CARD_EDGE
+			sb.set_border_width_all(4)
+			sb.set_corner_radius_all(56)
+			_lic_page.draw_style_box(sb, PANEL)
+	)
+	add_child(_lic_page)
+	var head := Label.new()
+	head.text = "Lisenser"
+	head.add_theme_font_size_override("font_size", 56)
+	head.add_theme_color_override("font_color", INK)
+	head.position = Vector2(150, 420)
+	_lic_page.add_child(head)
+	var back := RbDisc.new()
+	back.icon = "close"
+	back.disc_radius = 60.0
+	back.size = Vector2(160, 160)
+	back.position = Vector2(PANEL.end.x - 170, PANEL.position.y + 10)
+	back.tapped.connect(func() -> void: _lic_page.visible = false)
+	_lic_page.add_child(back)
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(150, 560)
+	scroll.size = Vector2(PANEL.size.x - 120, PANEL.end.y - 600)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_lic_page.add_child(scroll)
+	_lic_text = Label.new()
+	_lic_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lic_text.custom_minimum_size = Vector2(scroll.size.x - 30, 0)
+	_lic_text.add_theme_font_size_override("font_size", 28)
+	_lic_text.add_theme_color_override("font_color", INK)
+	scroll.add_child(_lic_text)
+	_lic_page.visible = false
+
+
+func _open_licenses() -> void:
+	if _lic_text.text == "":
+		_lic_text.text = license_text()
+	_lic_page.visible = true
+
+
+## Godot's licence, its third-party copyright notices with their licence
+## texts, and the Fredoka font licence.
+static func license_text() -> String:
+	var parts: PackedStringArray = []
+	parts.append("MWM Reef Bite er laget med Godot Engine.\n")
+	parts.append(_unwrap(Engine.get_license_text()))
+	parts.append("\nTredjepartskomponenter i Godot Engine:\n")
+	for info: Dictionary in Engine.get_copyright_info():
+		parts.append("- " + String(info["name"]))
+		for part: Dictionary in info["parts"]:
+			for c: String in part["copyright"]:
+				parts.append("  © " + c)
+			parts.append("  Lisens: " + String(part["license"]))
+	var lic: Dictionary = Engine.get_license_info()
+	for key: String in lic:
+		parts.append("\n" + key + "\n\n" + _unwrap(String(lic[key])))
+	var ofl: String = FileAccess.get_file_as_string("res://assets/fonts/Fredoka-OFL.txt")
+	if ofl != "":
+		parts.append("\nSkrift: Fredoka (SIL Open Font License 1.1)\n\n" + _unwrap(ofl))
+	return "\n".join(parts)
+
+
+## Joins the hard-wrapped lines of a licence text into paragraphs so the
+## label can wrap them to the panel width.
+static func _unwrap(t: String) -> String:
+	var re := RegEx.create_from_string("(?<!\\n)\\n(?!\\n)")
+	return re.sub(t, " ", true)
 
 
 func refresh() -> void:

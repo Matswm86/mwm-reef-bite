@@ -229,6 +229,13 @@ func _phase_shots() -> void:
 	main.map.gear.press()
 	await _wait(0.3)
 	await _shot("07_settings")
+	main.settings._licenses.pressed.emit()
+	await _wait(0.3)
+	_check(
+		"licence page shows the Godot licence",
+		main.settings._lic_page.visible and main.settings._lic_text.text.contains("Godot Engine")
+	)
+	await _shot("07b_licenses")
 	main._close_settings()
 	# L3 Bobla: the bubble appears at 8 s at (540, 700).
 	main.open_level(3)
