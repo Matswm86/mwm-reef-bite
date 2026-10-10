@@ -115,10 +115,16 @@ func _layout() -> void:
 
 ## Home disc and gear move below a camera cutout; their touch areas still run
 ## to the screen corner (copied from ball-connect 7ad7d50 via Orb Fence).
+## The home touch area stops where steering starts (the 232 px home square,
+## RbPlay.in_steer_area), so a steering touch under a deep cutout never arms
+## the home disc; it stays at least HOME_HIT tall (Orb Fence 701de64, QA
+## 2026-10-10 finding 4).
 func apply_safe_area() -> void:
 	var dy: float = maxf(0.0, safe_top_inset() - TOP_ROW_CLEAR)
+	var vs0: Vector2 = get_viewport().get_visible_rect().size
+	var steer_top: float = RbBalance.HOME_SQUARE * vs0.x / RbBalance.DESIGN_W
 	home.position = Vector2.ZERO
-	home.size = Vector2(HOME_HIT, HOME_HIT + dy)
+	home.size = Vector2(HOME_HIT, maxf(HOME_HIT, minf(HOME_HIT + dy, steer_top)))
 	home.disc_center = Vector2(104.0, 104.0 + dy)
 	home.queue_redraw()
 	var vs: Vector2 = get_viewport().get_visible_rect().size
