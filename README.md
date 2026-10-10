@@ -2,11 +2,11 @@
 
 <p>
   <img src="screenshots/gameplay.jpg" width="280" alt="Level 2: the golden player fish in open water, bubble rings around smaller fish it can eat and a spiky ring around a bigger fish">
-  <img src="screenshots/steering.jpg" width="280" alt="Level 1: the fish glides toward the aim ring a little above the finger">
+  <img src="screenshots/steering.jpg" width="280" alt="Level 1: the fish glides toward the aim ring by the finger">
   <img src="screenshots/win_card.jpg" width="280" alt="Level 1 win card: the grown fish, one star and the replay, map and next buttons">
 </p>
 
-**How to play:** hold a finger where you want to go and the fish glides there calmly, slowing down and settling under your finger. Eat the fish inside bubble rings, keep away from the spiky ones.
+**How to play:** hold a finger where you want to go and the fish glides there calmly, slowing down and settling under your finger. Touch a fish inside a bubble ring and your fish swims to it and eats it; keep away from the spiky ones.
 
 An underwater eat-and-grow game for children (ages 4-7 on Lett, 8+ on Vanlig). You steer a small golden fish with one finger through a sunlit kelp forest, eat the fish that are smaller than you, keep away from the bigger ones and grow until you reach the level's goal. A big fish that catches you just burps you out in a bubble, so a small child never loses.
 
@@ -29,7 +29,7 @@ World 1 "Tareskogen" (kelp forest), levels 1-5, in two settings:
 | 5 | Solstriper | grow to 4 / 5 | calm breather level |
 
 How it plays:
-- **Follow the finger:** hold a finger where you want to swim; the fish glides to a point a little above the fingertip, eases in and settles there, and turns around smoothly. Speeds are kept slow enough for a 4-year-old to follow (softer controls after the owner's phone test, 2026-10-10). A tap works too.
+- **Follow the finger:** hold a finger where you want to swim; the fish glides to a point a little above the fingertip (60 px on Lett, 120 px on Vanlig), eases in and settles there, and turns around smoothly. A finger within 160 px of a fish it can eat aims at that fish, so "touch the fish you want" works; it never aims at a bigger fish. Speeds are kept slow enough for a 4-year-old to follow (softer controls after the owner's phone test, 2026-10-10). A tap works too.
 - **Size tiers:** every fish has a size 1-10. Smaller fish are food, bigger fish are danger, same-size fish just bump.
 - **Four "can I eat it?" cues, none of them colour:** the size itself, your fish's mouth opens when food is in front of it, a smooth bubble ring around food and a spiky zigzag ring around danger, and danger fish open their mouths when close.
 - **Gentle catch:** Lett costs nothing (burped out in a bubble). Vanlig empties the current size meter; world 1 has unlimited bubbles, so there is never a restart here.
@@ -66,4 +66,4 @@ XDG_DATA_HOME=<tmp> CAPTURE_DIR=<dir> godot --audio-driver Dummy --display-drive
 
 The logic test has a bot clear levels 1-5 in both settings and checks the rules (catches, bobler and the gentle restart, bump, spawn mix, chase, kelp, Bobla, pearls, save, sounds). Never build the APK locally; CI does it (`.github/workflows/build-android.yml`).
 
-Credits and licences: `CREDITS.md`.
+Credits and licences: `CREDITS.md`. The Godot licence and its third-party notices are on the settings panel ("Lisenser").
