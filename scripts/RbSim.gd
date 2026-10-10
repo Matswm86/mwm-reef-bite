@@ -242,6 +242,26 @@ func set_aim(aim: Vector2) -> void:
 	)
 
 
+## Aim for a finger at `finger` (design px). An edible fish within
+## FOOD_MAGNET_R of the fingertip pulls the aim onto itself, so "touch the
+## fish you want" works; danger and same-tier fish never do. Otherwise the
+## lifted aim of RbBalance.aim_from_finger. Called every frame while the
+## finger is down, so the aim follows the fish as it swims.
+func aim_for_finger(finger: Vector2) -> Vector2:
+	var best: Fish = null
+	var best_d: float = RbBalance.FOOD_MAGNET_R
+	for f: Fish in fishes:
+		if f.leaving or ring_kind(f) != 1:
+			continue
+		var d: float = f.pos.distance_to(finger)
+		if d <= best_d:
+			best_d = d
+			best = f
+	if best != null:
+		return best.pos
+	return RbBalance.aim_from_finger(finger, easy)
+
+
 # ---------------------------------------------------------------- step
 
 

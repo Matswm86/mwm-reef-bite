@@ -243,14 +243,14 @@ func _input(event: InputEvent) -> void:
 	var sd := event as InputEventScreenDrag
 	if sd != null and sd.index == _pointer and finger_down:
 		_finger = to_design(sd.position)
-		sim.set_aim(RbBalance.aim_from_finger(_finger))
+		sim.set_aim(sim.aim_for_finger(_finger))
 
 
 func _touch_down(index: int, p: Vector2) -> void:
 	_pointer = index
 	finger_down = true
 	_finger = p
-	sim.set_aim(RbBalance.aim_from_finger(p))
+	sim.set_aim(sim.aim_for_finger(p))
 	if not touched_once:
 		touched_once = true
 		_onboard = false
@@ -273,7 +273,7 @@ func test_touch(p: Vector2, down: bool) -> void:
 			_touch_down(0, p)
 		else:
 			_finger = p
-			sim.set_aim(RbBalance.aim_from_finger(p))
+			sim.set_aim(sim.aim_for_finger(p))
 	else:
 		_touch_up()
 
@@ -302,7 +302,7 @@ func _process(delta: float) -> void:
 		if auto_bot and not sim.restarting:
 			sim.set_aim(RbBot.aim(sim))
 		elif finger_down:
-			sim.set_aim(RbBalance.aim_from_finger(_finger))
+			sim.set_aim(sim.aim_for_finger(_finger))
 	var left: float = dt
 	while left > 0.0:
 		var h: float = minf(left, MAX_STEP)
@@ -352,8 +352,8 @@ func _update_hints(delta: float) -> void:
 		var cyc: float = fmod(t, RbBalance.HINT_LOOP_S)
 		if cyc < delta * 1.5 or _hint_target == Vector2.ZERO:
 			_hint_target = _nearest_food()
-		# Press just below the nearest small fish; the fish swims there.
-		hand.tip = _hint_target + Vector2(0, RbBalance.FINGER_LIFT)
+		# Press on the nearest small fish (the food magnet aims there).
+		hand.tip = _hint_target
 		hand.alpha = (
 			clampf(cyc / 0.3, 0.0, 1.0) * clampf((RbBalance.HINT_LOOP_S - cyc) / 0.3, 0.0, 1.0)
 		)

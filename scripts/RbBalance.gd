@@ -39,7 +39,14 @@ const ARRIVE_GAIN: float = 2.0
 ## Inside this distance from the aim point the fish wants to stop, so it
 ## settles under the finger instead of jittering.
 const ARRIVE_DEADZONE: float = 28.0
+## Aim point above the fingertip so the finger does not cover the fish.
+## Lett uses a smaller lift: a child who presses ON the fish it wants must
+## still reach it (QA 2026-10-10 finding 1; owner decision).
 const FINGER_LIFT: float = 120.0
+const FINGER_LIFT_LETT: float = 60.0
+## Food magnet (Lett and Vanlig): a finger within this distance of an
+## edible (lower-tier) fish aims at that fish. Never at a danger fish.
+const FOOD_MAGNET_R: float = 160.0
 const LIFT_FADE_Y0: float = 1400.0
 const LIFT_FADE_Y1: float = 1640.0
 const TILT_MAX_DEG: float = 25.0
@@ -200,12 +207,17 @@ static func hint_idle(easy: bool) -> float:
 	return HINT_IDLE_LETT if easy else HINT_IDLE_VANLIG
 
 
-## Aim point for a finger at `finger` (design px): lifted FINGER_LIFT above
-## the fingertip, the lift fading to 0 between y 1400 and 1640, clamped
-## inside the pond (GDD 3.3).
-static func aim_from_finger(finger: Vector2) -> Vector2:
+static func finger_lift(easy: bool) -> float:
+	return FINGER_LIFT_LETT if easy else FINGER_LIFT
+
+
+## Aim point for a finger at `finger` (design px): lifted finger_lift(easy)
+## above the fingertip, the lift fading to 0 between y 1400 and 1640,
+## clamped inside the pond (GDD 3.3). RbSim.aim_for_finger adds the food
+## magnet on top of this.
+static func aim_from_finger(finger: Vector2, easy: bool) -> Vector2:
 	var k: float = clampf((finger.y - LIFT_FADE_Y0) / (LIFT_FADE_Y1 - LIFT_FADE_Y0), 0.0, 1.0)
-	var aim := Vector2(finger.x, finger.y - FINGER_LIFT * (1.0 - k))
+	var aim := Vector2(finger.x, finger.y - finger_lift(easy) * (1.0 - k))
 	aim.x = clampf(aim.x, POND.position.x, POND.end.x)
 	aim.y = clampf(aim.y, POND.position.y, POND.end.y)
 	return aim

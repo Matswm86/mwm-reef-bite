@@ -194,15 +194,21 @@ func _phase_look() -> void:
 		play.auto_bot = false
 
 
+## QA_EASY=0 runs the kids sims in Vanlig (default Lett).
+func _kids_easy() -> bool:
+	return OS.get_environment("QA_EASY") != "0"
+
+
 ## A child who puts the finger right ON the nearest food fish (not below it)
-## and follows it, re-picking every 1.5 s. The aim sits 120 px above the
-## finger, so this shows whether "touch what you want" still works.
+## and follows it, re-picking every 1.5 s. The aim goes through the game's
+## own RbSim.aim_for_finger (food magnet, then the finger lift), so this
+## shows whether "touch what you want" works.
 func _kids_touch_food(id: int) -> void:
 	var times: Array[float] = []
 	var cleared: int = 0
 	for s: int in 20:
 		var sim := RbSim.new()
-		sim.setup(id, true, 500 + s)
+		sim.setup(id, _kids_easy(), 500 + s)
 		var t: float = 0.0
 		var target: RbSim.Fish = null
 		var repick: float = 0.0
@@ -221,7 +227,7 @@ func _kids_touch_food(id: int) -> void:
 				var fp: Vector2 = target.pos.clamp(Vector2(20, 260), Vector2(1060, 1660))
 				# QA_NO_LIFT=1: what-if, the aim goes to the finger itself.
 				var no_lift: bool = OS.get_environment("QA_NO_LIFT") == "1"
-				sim.set_aim(fp if no_lift else RbBalance.aim_from_finger(fp))
+				sim.set_aim(fp if no_lift else sim.aim_for_finger(fp))
 			sim.step(DT)
 			sim.events.clear()
 			t += DT
@@ -231,7 +237,7 @@ func _kids_touch_food(id: int) -> void:
 	times.sort()
 	print(
 		(
-			"KIDS L%d Lett finger ON the food: cleared %d/20 median %.0f s max %.0f s"
+			"KIDS L%d finger ON the food: cleared %d/20 median %.0f s max %.0f s"
 			% [
 				id,
 				cleared,
@@ -255,7 +261,7 @@ func _phase_kids() -> void:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = 1000 + s
 			var sim := RbSim.new()
-			sim.setup(id, true, 500 + s)
+			sim.setup(id, _kids_easy(), 500 + s)
 			var t: float = 0.0
 			var hold: float = 0.0
 			var gap: float = 0.0
@@ -266,7 +272,7 @@ func _phase_kids() -> void:
 					if rng.randf() < 0.01:
 						finger += Vector2(rng.randf_range(-150, 150), rng.randf_range(-150, 150))
 						finger = finger.clamp(Vector2(20, 260), Vector2(1060, 1660))
-					sim.set_aim(RbBalance.aim_from_finger(finger))
+					sim.set_aim(sim.aim_for_finger(finger))
 					if hold <= 0.0:
 						gap = rng.randf_range(0.0, 2.0)
 				elif gap > 0.0:
@@ -285,7 +291,7 @@ func _phase_kids() -> void:
 		catches.sort()
 		print(
 			(
-				"KIDS L%d Lett random: cleared %d/20 median %.0f s max %.0f s catches %d max %d"
+				"KIDS L%d random: cleared %d/20 median %.0f s max %.0f s catches %d max %d"
 				% [
 					id,
 					cleared,

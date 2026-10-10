@@ -491,21 +491,65 @@ func _test_kelp_bobla_pearls() -> void:
 # ---------------------------------------------------------------- 9
 
 
+## Food magnet (QA 2026-10-10 finding 1): a finger within 160 px of an
+## edible fish aims at it, in Lett and Vanlig; never at a danger fish.
+func _test_food_magnet() -> void:
+	for easy: bool in [true, false]:
+		var m := RbSim.new()
+		m.setup(2, easy, 9)
+		m.fishes.clear()
+		var food := RbSim.Fish.new()
+		food.tier = m.p_tier - 1
+		food.pos = Vector2(600, 900)
+		m.fishes.append(food)
+		var big := RbSim.Fish.new()
+		big.tier = m.p_tier + 1
+		big.pos = Vector2(300, 900)
+		m.fishes.append(big)
+		var mode: String = "Lett" if easy else "Vanlig"
+		_check(
+			m.aim_for_finger(Vector2(600, 1050)) == food.pos,
+			"%s: finger 150 px from food aims at the food" % mode
+		)
+		_check(
+			(
+				m.aim_for_finger(Vector2(600, 1070))
+				== RbBalance.aim_from_finger(Vector2(600, 1070), easy)
+			),
+			"%s: finger 170 px from food keeps the lifted aim" % mode
+		)
+		_check(
+			(
+				m.aim_for_finger(Vector2(300, 900))
+				== RbBalance.aim_from_finger(Vector2(300, 900), easy)
+			),
+			"%s: finger on a danger fish never magnets onto it" % mode
+		)
+
+
 func _test_lift_and_flash() -> void:
 	print("9. finger lift, flash limiter")
 	_check(
-		RbBalance.aim_from_finger(Vector2(500, 1000)) == Vector2(500, 880),
-		"aim 120 px above the finger"
+		RbBalance.aim_from_finger(Vector2(500, 1000), false) == Vector2(500, 880),
+		"Vanlig: aim 120 px above the finger"
 	)
-	_check(RbBalance.aim_from_finger(Vector2(500, 1640)) == Vector2(500, 1640), "lift 0 at y 1640")
 	_check(
-		RbBalance.aim_from_finger(Vector2(500, 1520)) == Vector2(500, 1460),
+		RbBalance.aim_from_finger(Vector2(500, 1000), true) == Vector2(500, 940),
+		"Lett: aim 60 px above the finger"
+	)
+	_check(
+		RbBalance.aim_from_finger(Vector2(500, 1640), false) == Vector2(500, 1640),
+		"lift 0 at y 1640"
+	)
+	_check(
+		RbBalance.aim_from_finger(Vector2(500, 1520), false) == Vector2(500, 1460),
 		"lift fades (60 px at y 1520)"
 	)
 	_check(
-		RbBalance.aim_from_finger(Vector2(500, 300)).y == RbBalance.POND.position.y,
+		RbBalance.aim_from_finger(Vector2(500, 300), false).y == RbBalance.POND.position.y,
 		"aim clamped inside the pond"
 	)
+	_test_food_magnet()
 	var fl := RbFlashLimiter.new()
 	var granted: int = 0
 	for i: int in 5:

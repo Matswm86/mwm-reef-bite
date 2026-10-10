@@ -90,6 +90,28 @@ func _touch(screen_p: Vector2, down: bool) -> void:
 	Input.parse_input_event(ev)
 
 
+## Design px on the play plane -> screen px (inverse of RbPlay.to_design),
+## so the touches land on the same pond spot at 1080x1920 and 1080x2400.
+func _screen(design_p: Vector2) -> Vector2:
+	var vs: Vector2 = get_viewport().get_visible_rect().size
+	var k: float = RbBalance.DESIGN_W / vs.x
+	return vs * 0.5 + (design_p - Vector2(540.0, 960.0)) / k
+
+
+## Screen px for a point given in design px from the top-left (home square)
+## or from the bottom edge (wrist strip), the way RbPlay.in_steer_area
+## measures them.
+func _screen_top_left(design_p: Vector2) -> Vector2:
+	var k: float = RbBalance.DESIGN_W / get_viewport().get_visible_rect().size.x
+	return design_p / k
+
+
+func _screen_from_bottom(design_x: float, design_up: float) -> Vector2:
+	var vs: Vector2 = get_viewport().get_visible_rect().size
+	var k: float = RbBalance.DESIGN_W / vs.x
+	return Vector2(design_x / k, vs.y - design_up / k)
+
+
 func _drag(screen_p: Vector2) -> void:
 	var ev := InputEventScreenDrag.new()
 	ev.index = 0
@@ -116,31 +138,43 @@ func _phase_shots() -> void:
 	await _wait(1.7)
 	await _shot("01_l1_start_hand")
 	_check("onboarding hand visible", play.hand.alpha > 0.5)
-	# A real touch in the pond: aim ring, fish swims toward the lifted aim.
+	# A real touch in the pond: aim ring, fish swims toward the aim (the
+	# food magnet's fish, else 60 px above the finger in Lett).
 	await _wait(0.4)
 	var p0: Vector2 = play.sim.p_pos
-	_touch(Vector2(800, 1250), true)
+	_touch(_screen(Vector2(800, 1250)), true)
 	await _wait(0.2)
-	_drag(Vector2(820, 1240))
+	_drag(_screen(Vector2(820, 1240)))
 	await _wait(0.5)
-	_check("touch steers: aim lifted 120 px", absf(play.sim.p_aim.y - 1120.0) < 2.0)
+	var want: Vector2 = play.sim.aim_for_finger(Vector2(820, 1240))
 	_check(
-		"fish swims toward the finger",
-		play.sim.p_pos.distance_to(Vector2(820, 1120)) < p0.distance_to(Vector2(820, 1120))
+		"touch steers through aim_for_finger (%s)" % want, play.sim.p_aim.distance_to(want) < 6.0
 	)
+	_check("fish swims toward the aim", play.sim.p_pos.distance_to(want) < p0.distance_to(want))
 	_check("hand gone after the first touch", play.hand.alpha < 0.01)
 	await _shot("02_l1_touch_aim")
-	_touch(Vector2(820, 1240), false)
+	_touch(_screen(Vector2(820, 1240)), false)
 	# Wrist strip and home square ignore touch-downs.
 	var aim_before: Vector2 = play.sim.p_aim
-	_touch(Vector2(500, 1800), true)
+	_touch(_screen_from_bottom(500.0, 120.0), true)
 	await _frames(2)
-	_touch(Vector2(500, 1800), false)
+	_touch(_screen_from_bottom(500.0, 120.0), false)
 	_check("wrist strip touch ignored", play.sim.p_aim == aim_before)
-	_touch(Vector2(100, 100), true)
+	_touch(_screen_top_left(Vector2(100, 100)), true)
 	await _frames(2)
-	_touch(Vector2(100, 100), false)
+	_touch(_screen_top_left(Vector2(100, 100)), false)
 	_check("home square touch does not steer", play.sim.p_aim == aim_before)
+	# Under a deep camera cutout the lowered home touch area must stay out
+	# of the steer area (QA 2026-10-10 finding 4).
+	main.fake_safe_top = 120.0
+	main.apply_safe_area()
+	var steer_top: float = _screen_top_left(Vector2(0, RbBalance.HOME_SQUARE)).y
+	_check(
+		"cutout: home touch area ends at the steer area (%.0f)" % main.home.get_global_rect().end.y,
+		main.home.get_global_rect().end.y <= steer_top + 0.5
+	)
+	main.fake_safe_top = -1.0
+	main.apply_safe_area()
 	# Win card.
 	_check("L1 cleared by the bot", await _bot_until_clear(60.0))
 	var t_card: int = Time.get_ticks_msec() + 5000
