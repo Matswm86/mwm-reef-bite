@@ -1,22 +1,26 @@
 # MWM Reef Bite
 
+An underwater eat-and-grow game for children on Android (ages 4-7 on the Lett setting, 8+ on Vanlig). You steer a small golden fish with one finger through a sunlit kelp forest, eat the fish that are smaller than you, keep away from the bigger ones and grow until you reach the level's goal. A big fish that catches you just burps you out in a bubble, so a small child never loses.
+
 <p>
   <img src="screenshots/gameplay.jpg" width="280" alt="Level 2: the golden player fish in open water, bubble rings around smaller fish it can eat and a spiky ring around a bigger fish">
   <img src="screenshots/steering.jpg" width="280" alt="Level 1: the fish glides toward the aim ring by the finger">
   <img src="screenshots/win_card.jpg" width="280" alt="Level 1 win card: the grown fish, one star and the replay, map and next buttons">
 </p>
 
-**How to play:** hold a finger where you want to go and the fish glides there calmly, slowing down and settling under your finger. Touch a fish inside a bubble ring and your fish swims to it and eats it; keep away from the spiky ones.
+*Left to right: level 2 (bubble rings mark food, spiky rings mark danger), level 1 steering toward the aim ring, and the level 1 win card.*
 
-An underwater eat-and-grow game for children (ages 4-7 on Lett, 8+ on Vanlig). You steer a small golden fish with one finger through a sunlit kelp forest, eat the fish that are smaller than you, keep away from the bigger ones and grow until you reach the level's goal. A big fish that catches you just burps you out in a bubble, so a small child never loses.
+## Download
 
-**Download the Android APK:** https://github.com/Matswm86/mwm-reef-bite/releases/download/latest/mwm-reef-bite.apk
+**Android APK:** https://github.com/Matswm86/mwm-reef-bite/releases/download/latest/mwm-reef-bite.apk
 
 - No ads, no tracking, no accounts, no network, no in-app purchases.
 - Works offline. Asks for no Android permissions.
-- Debug-signed sideload build (built by GitHub Actions on every push to `main`). If Android warns about the source, allow "Install from this source". Uninstall an older build first if the signature changed.
+- Debug-signed sideload build (built by GitHub Actions on every push to `main`). Open the file and, if Android warns about the source, allow "Install from this source" (Install unknown apps) for the browser or file manager. Uninstall an older build first if the signature changed.
 
-## What is in this build (world 1 vertical slice)
+## What it does
+
+**How to play:** hold a finger where you want to go and the fish glides there calmly, slowing down and settling under your finger. Touch a fish inside a bubble ring and your fish swims to it and eats it; keep away from the spiky ones.
 
 World 1 "Tareskogen" (kelp forest), levels 1-5, in two settings:
 
@@ -36,7 +40,13 @@ How it plays:
 - No text for the child, no score, no timer, no game over. One star per cleared level.
 - Settings (gear on the map, stand-alone only): Lett / Vanlig, sound and music with volume sliders, "Mindre bevegelse" (less motion).
 
-Inside the MWM Play family app the game runs in shell mode: the app's home button replaces the game's own, levels 1-3 are free and the full game is unlocked by the app.
+## How it works
+
+The game is written in GDScript with static types on Godot 4.6.2 and exported to Android with the `mobile` renderer, portrait 1080x1920. The rules are a pure simulation with no scene nodes in it (steering, eating, catching, spawning, pearls, the bubble shield); a separate play layer reads touch input, runs the simulation and draws it. The picture is a real 3D kelp forest: all gameplay fish sit on one plane under a fixed perspective camera, so the size on screen is the size tier, and the fish and kelp are own-work models whose swim, jaw and fin motion run in vertex shaders. Sound effects and the music loop are synthesised by Python scripts in `tools/`, and progress and settings live in one small save file on the device. Inside the MWM Play family app the game runs in shell mode: the app's home button replaces the game's own, levels 1-3 are free and the full game is unlocked by the app.
+
+## Status
+
+Version 0.1.0, the world 1 vertical slice (levels 1-5 in Lett and Vanlig). Worlds 2-6 and the endless mode "Uendelig" are not built yet.
 
 ## For developers
 
@@ -52,12 +62,12 @@ Godot 4.6.2, GDScript with static types, `mobile` renderer, portrait 1080x1920. 
 | `tools/render_sfx.py`, `tools/render_music.py` | Own-synthesis sound effects and the calm music loop |
 | `tools/make_textures.py` | Caustic texture and app icon |
 
-**Models.** The sculpted fish (`assets/models/fish/`, player `golden_trevally` plus tiers 1-7) and kelp (`assets/models/kelp/`) load by file name; their contracts are in the READMEs next to them. Fish names per tier live in `RbFishCatalog.SPECIES`; a tier without a GLB (8-10, not reached in world 1) falls back to a procedural proxy. The loader applies `shaders/rb_fish_glb*.gdshader` (swim, jaw, fin flare from the vertex-colour masks) and `rb_kelp_glb.gdshader` (current sway). Lav tier (32-bit devices): body and fins merged into one draw per fish, no normal maps. `RB_PROXY_FISH=1` forces the proxies; `godot --headless -s tests/glb_check.gd` load-checks every GLB.
+**Models.** The sculpted fish (`assets/models/fish/`, player `golden_trevally` plus tiers 1-7) and kelp (`assets/models/kelp/`) load by file name; their contracts are in the READMEs next to them. Fish names per tier live in `RbFishCatalog.SPECIES`; a tier without a GLB (8-10, not reached in world 1) falls back to a procedural proxy. The loader applies `shaders/rb_fish_glb*.gdshader` (swim, jaw, fin flare from the vertex-colour masks) and `rb_kelp_glb.gdshader` (current sway). Lav tier (32-bit devices): body and fins merged into one draw per fish, no normal maps. `RB_PROXY_FISH=1` forces the proxies; `godot --headless --audio-driver Dummy -s tests/glb_check.gd` load-checks every GLB.
 
 Checks (run in the game folder, always with `--audio-driver Dummy`):
 
 ```bash
-../game-studio/tools/gd-android-lint.sh .
+# Android lint: the studio's gd-android-lint.sh (a script outside this repo)
 godot --headless --audio-driver Dummy --quit
 XDG_DATA_HOME=<tmp> godot --headless --audio-driver Dummy res://tests/logic_test.tscn
 XDG_DATA_HOME=<tmp> CAPTURE_DIR=<dir> godot --audio-driver Dummy --display-driver x11 \
